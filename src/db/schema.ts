@@ -17,7 +17,7 @@ import { SLEEP_RANGES } from "@/domain/mood/constants";
 export const sleepRangeEnum = pgEnum("sleep_range", SLEEP_RANGES);
 
 export const users = pgTable("users", {
-  id: bigint("id", { mode: "bigint" })
+  id: bigint("id", { mode: "number" })
     .primaryKey()
     .generatedAlwaysAsIdentity(),
   clerkUserId: text("clerk_user_id").notNull().unique(),
@@ -34,10 +34,10 @@ export const users = pgTable("users", {
 export const moodEntries = pgTable(
   "mood_entries",
   {
-    id: bigint("id", { mode: "bigint" })
+    id: bigint("id", { mode: "number" })
       .primaryKey()
       .generatedAlwaysAsIdentity(),
-    userId: bigint("user_id", { mode: "bigint" })
+    userId: bigint("user_id", { mode: "number" })
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     entryDate: date("entry_date", { mode: "string" }).notNull(),
