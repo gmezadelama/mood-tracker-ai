@@ -45,3 +45,9 @@ export const FEELINGS = [
 ] as const;
 
 export type Feeling = (typeof FEELINGS)[number];
+
+export const MAX_FEELINGS_PER_ENTRY = 3;
+
+// A day's reflection, not an essay — generous enough for the FM sample
+// journal entries (all well under 100 chars) with real room to spare.
+export const JOURNAL_ENTRY_MAX_LENGTH = 500;
