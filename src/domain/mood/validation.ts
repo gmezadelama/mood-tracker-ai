@@ -19,10 +19,15 @@ export const sleepRangeSchema = z.enum(SLEEP_RANGES);
 // from a UTC instant.
 export const entryDateSchema = z.iso.date();
 
-export const moodEntryInputSchema = z.object({
+export const moodEntryInputSchema = z.strictObject({
   entryDate: entryDateSchema,
   mood: moodValueSchema,
-  feelings: z.array(feelingSchema).max(MAX_FEELINGS_PER_ENTRY),
+  feelings: z
+    .array(feelingSchema)
+    .max(MAX_FEELINGS_PER_ENTRY)
+    .refine((feelings) => new Set(feelings).size === feelings.length, {
+      message: "Feelings must not contain duplicates",
+    }),
   journalEntry: z.string().trim().min(1).max(JOURNAL_ENTRY_MAX_LENGTH),
   sleepRange: sleepRangeSchema,
 });
