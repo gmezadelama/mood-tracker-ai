@@ -54,12 +54,11 @@ export function MoodLogDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
+    if (!dialog.open) {
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+    }
     dialog.focus();
-    return () => {
-      if (dialog.open && typeof dialog.close === "function") dialog.close();
-    };
   }, []);
 
   function close() {
