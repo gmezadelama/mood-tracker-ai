@@ -19,6 +19,9 @@ export const currentEntry: MockMoodEntry = {
   sleepHours: 9,
 };
 
+export const currentMoodQuote =
+  "When your heart is full, share your light with the world.";
+
 export const recentEntries: MockMoodEntry[] = [
   {
     id: "2025-03-31",
@@ -126,3 +129,61 @@ export const moodIconNames: Record<MockMood, string> = {
   1: "happy",
   2: "very-happy",
 };
+
+const sleepLabels: Record<MockSleepRange, string> = {
+  1: "0-2 Hours",
+  3.5: "3-4 Hours",
+  5.5: "5-6 Hours",
+  7.5: "7-8 Hours",
+  9: "9+ Hours",
+};
+
+type Trend = "increase" | "decrease" | "same";
+
+export interface MockAverage {
+  value: string;
+  trend: Trend;
+}
+
+function compare(current: number, previous: number): Trend {
+  if (current > previous) return "increase";
+  if (current < previous) return "decrease";
+  return "same";
+}
+
+function mean(values: number[]) {
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function closestSleepRange(value: number): MockSleepRange {
+  const ranges = Object.keys(sleepLabels).map(Number) as MockSleepRange[];
+  return ranges.reduce((closest, range) =>
+    Math.abs(range - value) < Math.abs(closest - value) ? range : closest,
+  );
+}
+
+export function calculateMockAverages(entries: MockMoodEntry[]): {
+  mood: MockAverage;
+  sleep: MockAverage;
+} {
+  const completedEntries = entries.filter((entry) => entry.id !== currentEntry.id);
+  const latest = completedEntries.slice(-5);
+  const previous = completedEntries.slice(-10, -5);
+  const latestMood = mean(latest.map((entry) => entry.mood));
+  const previousMood = mean(previous.map((entry) => entry.mood));
+  const latestSleep = mean(latest.map((entry) => entry.sleepHours));
+  const previousSleep = mean(previous.map((entry) => entry.sleepHours));
+
+  return {
+    mood: {
+      value: moodLabels[Math.round(latestMood) as MockMood],
+      trend: compare(Math.round(latestMood), Math.round(previousMood)),
+    },
+    sleep: {
+      value: sleepLabels[closestSleepRange(latestSleep)],
+      trend: compare(latestSleep, previousSleep),
+    },
+  };
+}
+
+export const mockAverages = calculateMockAverages(recentEntries);

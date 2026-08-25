@@ -1,7 +1,15 @@
 import Image from "next/image";
 
 import { MoodTrendChart } from "./mood-trend-chart";
-import { currentEntry, moodIconNames, moodLabels, recentEntries } from "./mock-data";
+import {
+  currentEntry,
+  currentMoodQuote,
+  mockAverages,
+  moodIconNames,
+  moodLabels,
+  recentEntries,
+  type MockAverage,
+} from "./mock-data";
 
 const cardClass = "rounded-2xl border border-blue-100 bg-white";
 
@@ -40,7 +48,7 @@ function MoodCard() {
   return (
     <article className={`${cardClass} relative h-[507px] overflow-hidden shadow-[0_0_20px_rgba(1,5,39,0.08)] sm:h-[340px]`}>
       <div className="absolute left-4 top-8 z-10 text-left sm:left-8">
-        <p className="text-[32px] font-bold leading-[45px] text-navy">I’m feeling</p>
+        <h2 className="text-[32px] font-bold leading-[45px] text-navy">I’m feeling</h2>
         <p className="text-[40px] font-bold leading-[48px] tracking-[-1.2px] text-navy">
           {moodLabels[currentEntry.mood]}
         </p>
@@ -49,7 +57,7 @@ function MoodCard() {
       <div className="absolute left-1/2 top-[157px] size-[200px] -translate-x-1/2 sm:left-auto sm:right-10 sm:top-[50px] sm:size-[320px] sm:translate-x-0 lg:right-10">
         <Image
           src={`/images/icon-${moodIconNames[currentEntry.mood]}-color.svg`}
-          alt="A very happy face"
+          alt=""
           fill
           sizes="(max-width: 639px) 200px, 320px"
           priority
@@ -64,7 +72,7 @@ function MoodCard() {
           height={24}
           className="mx-auto mb-4 sm:mx-0 sm:mb-3"
         />
-        “When your heart is full, share your light with the world.”
+        “{currentMoodQuote}”
       </blockquote>
     </article>
   );
@@ -104,23 +112,32 @@ function AveragesCard() {
     <section aria-label="Mood and sleep averages" className={`${cardClass} h-[444px] p-4 sm:h-[452px] sm:p-6 lg:h-[453px]`}>
       <AverageBlock
         title="Average Mood"
-        value="Neutral"
+        value={mockAverages.mood.value}
         icon="/images/icon-neutral-white.svg"
-        trendIcon="/images/icon-trend-same.svg"
-        trend="Same as the previous 5 check-ins"
+        trendIcon={trendIcon(mockAverages.mood.trend)}
+        trend={trendCopy(mockAverages.mood.trend)}
         background="#89caff"
         dark
       />
       <AverageBlock
         title="Average Sleep"
-        value="5-6 Hours"
+        value={mockAverages.sleep.value}
         icon="/images/icon-sleep.svg"
-        trendIcon="/images/icon-trend-increase.svg"
-        trend="Increase from the previous 5 check-ins"
+        trendIcon={trendIcon(mockAverages.sleep.trend)}
+        trend={trendCopy(mockAverages.sleep.trend)}
         background="#4865db"
       />
     </section>
   );
+}
+
+function trendIcon(trend: MockAverage["trend"]) {
+  return `/images/icon-trend-${trend}.svg`;
+}
+
+function trendCopy(trend: MockAverage["trend"]) {
+  const label = trend === "same" ? "Same as" : `${trend[0].toUpperCase()}${trend.slice(1)} from`;
+  return `${label} the previous 5 check-ins`;
 }
 
 function AverageBlock({

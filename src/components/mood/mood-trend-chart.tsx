@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -34,10 +35,16 @@ interface ChartDatum extends MockMoodEntry {
 }
 
 export function MoodTrendChart({ entries }: { entries: MockMoodEntry[] }) {
+  const scrollRegionRef = useRef<HTMLDivElement>(null);
   const data: ChartDatum[] = entries.map((entry) => ({
     ...entry,
     sleepLevel: sleepLevels[entry.sleepHours],
   }));
+
+  useEffect(() => {
+    const region = scrollRegionRef.current;
+    if (region) region.scrollLeft = region.scrollWidth;
+  }, []);
 
   return (
     <section className="h-[420px] rounded-2xl border border-blue-100 bg-white px-4 py-5 sm:h-[437px] sm:px-6 sm:py-6 lg:h-[453px] lg:px-8 lg:py-8">
@@ -59,10 +66,16 @@ export function MoodTrendChart({ entries }: { entries: MockMoodEntry[] }) {
           ))}
         </div>
 
-        <div aria-hidden="true" className="relative h-[307px] min-w-0 flex-1 overflow-hidden">
-          <div className="absolute right-0 top-0 h-[307px] w-[600px] lg:w-[626px]">
-            <ResponsiveContainer width="100%" height={307}>
-              <BarChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        <div className="relative min-w-0 flex-1">
+          <div
+            ref={scrollRegionRef}
+            aria-label="Mood and sleep chart. Scroll horizontally to view earlier entries."
+            className="h-[307px] overflow-x-auto overflow-y-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            role="region"
+            tabIndex={0}
+          >
+            <div aria-hidden="true" className="h-[307px] w-[626px]">
+              <BarChart width={626} height={307} data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <CartesianGrid
                 horizontal
                 vertical={false}
@@ -84,10 +97,12 @@ export function MoodTrendChart({ entries }: { entries: MockMoodEntry[] }) {
                 barSize={40}
                 radius={[20, 20, 20, 20]}
                 shape={<MoodBar />}
+                isAnimationActive={false}
               />
               </BarChart>
-            </ResponsiveContainer>
+            </div>
           </div>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-white to-transparent lg:hidden" />
         </div>
       </div>
 
