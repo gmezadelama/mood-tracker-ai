@@ -1,11 +1,12 @@
-export default function Home() {
+import { Dashboard } from "@/components/mood/dashboard";
+import { SiteHeader } from "@/components/site-header";
+
+export default function HomePage() {
   return (
-    <main className="flex flex-1 items-center justify-center p-8">
-      <div className="max-w-xl text-center">
-        <h1 className="text-4xl font-semibold tracking-tight">Mood Tracker AI</h1>
-        <p className="mt-4 text-lg text-slate-600">
-          Project foundation ready. Product development begins with v0.
-        </p>
+    <main className="min-h-screen overflow-hidden px-4 pb-16 sm:px-8 sm:pb-20">
+      <div className="mx-auto w-full max-w-[1170px]">
+        <SiteHeader />
+        <Dashboard />
       </div>
     </main>
   );
