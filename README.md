@@ -1,40 +1,126 @@
 # Mood Tracker AI
 
-An AI-enhanced mood tracking web application based on the Frontend Mentor mood tracking challenge. The project is currently in the bootstrap / pre-v0 stage: its production foundation is configured, but no product functionality has been implemented.
+A responsive mood tracking application based on the Frontend Mentor Mood Tracking App challenge.
 
-## Stack
+The project is being built incrementally, starting with a production-quality implementation of the original challenge and later adding carefully scoped AI personalization and lightweight gamification.
 
-Next.js App Router, React, TypeScript, Tailwind CSS, Clerk, Neon PostgreSQL, Drizzle ORM, Zod, Recharts, Vercel AI SDK with Google Gemini, Vitest, React Testing Library, and Playwright.
+## Current status
 
-shadcn/ui components may be added selectively when an accessible primitive is needed. No shadcn components or supporting utility dependencies are included during bootstrap.
+**v0 — Phase 3 complete**
 
-## Roadmap
+Implemented so far:
 
-- **v0:** Frontend Mentor baseline
-- **v1:** AI-assisted mood insights and personalized responses
-- **v1.1:** Personalized challenges and deterministic achievements
+- PostgreSQL persistence model with Neon and Drizzle ORM
+- Application user and mood-entry data model
+- Mood-entry backend API
+- Validation with Zod
+- Recent mood history endpoint
+- One-entry-per-user-per-day persistence rules
+- Responsive Frontend Mentor dashboard UI
+- Current mood presentation
+- Average mood and sleep cards
+- Mood/sleep trends visualization with Recharts
+- Mock data for frontend development
+- Backend and frontend QA passes
 
-## Local setup
+The frontend is currently intentionally using mock data.
 
-1. Use an active Node.js LTS release.
-2. Install dependencies with `npm install`.
-3. Copy `.env.example` to `.env.local` and provide the services needed for the feature you are working on.
-4. Start the application with `npm run dev`.
+Authentication, the mood logging interaction, and client/backend integration are separate upcoming phases.
 
-## Environment variables
+## Technology stack
 
-| Variable | Purpose |
-| --- | --- |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser-safe publishable key |
-| `CLERK_SECRET_KEY` | Clerk server-side secret key |
-| `DATABASE_URL` | Neon PostgreSQL connection string |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | Gemini API key used only on the server |
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Recharts
+- Clerk
+- Neon PostgreSQL
+- Drizzle ORM
+- Zod
+- Vitest
+- React Testing Library
+- Playwright
+- Vercel AI SDK
+- Google Gemini
 
-## Commands
+## Development roadmap
 
-- `npm run lint` — lint the project
-- `npm run typecheck` — run TypeScript without emitting files
-- `npm test` — run unit/component tests once
-- `npm run test:watch` — run unit/component tests in watch mode
-- `npm run test:e2e` — run Playwright smoke tests
-- `npm run build` — create a production build
+### v0 — Frontend Mentor baseline
+
+Original mood tracking application without AI or additional gamification.
+
+Completed:
+
+- Persistence model
+- Backend/API
+- Responsive dashboard UI with mock data
+
+Next:
+
+- Mood logging flow
+- Authentication
+- Client/backend integration
+- Final accessibility, responsive, and production QA
+
+### v1 — AI-enhanced mood tracker
+
+Planned AI functionality:
+
+- Journal entry → suggested mood, feelings, keywords, and explanation
+- Personalized response based on the current mood entry
+- Original Frontend Mentor responses remain available as the fallback when AI generation is unavailable or quota is exhausted
+
+AI suggestions remain advisory and never silently modify user data.
+
+### v1.1 — Gamification
+
+Planned lightweight enhancements:
+
+- AI-generated optional micro-challenges
+- Deterministic achievement badges
+
+AI will be used for personalization, while normal application logic will handle progression and rewards.
+
+## Local development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create `.env.local` using `.env.example` as reference.
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+## Verification
+
+Depending on the scripts defined in `package.json`:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+End-to-end tests use Playwright.
+
+## Project principles
+
+The application intentionally favors:
+
+- simple architecture
+- strong TypeScript
+- accessible responsive UI
+- relational persistence
+- explicit server/client boundaries
+- carefully scoped AI functionality
+- small, understandable dependencies
+
+The project is intentionally **not** an AI agent, therapy application, medical product, social network, or large recommendation system.
