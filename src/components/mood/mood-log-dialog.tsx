@@ -129,7 +129,7 @@ export function MoodLogDialog({
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      className="m-auto max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-[600px] overflow-y-auto rounded-2xl bg-[linear-gradient(180deg,#f5f5ff_73%,#e0e0ff_100%)] p-0 text-navy shadow-[0_20px_60px_rgba(33,33,77,0.3)] outline-none backdrop:bg-navy/70"
+      className="m-0 h-dvh max-h-none w-dvw max-w-none overflow-y-auto rounded-none bg-[linear-gradient(180deg,#f5f5ff_73%,#e0e0ff_100%)] p-0 text-navy shadow-none outline-none backdrop:bg-navy/70 sm:m-auto sm:h-fit sm:max-h-[calc(100dvh-32px)] sm:w-[calc(100%-32px)] sm:max-w-[600px] sm:rounded-2xl sm:shadow-[0_20px_60px_rgba(33,33,77,0.3)]"
       tabIndex={-1}
       onCancel={(event) => {
         event.preventDefault();
