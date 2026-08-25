@@ -1,19 +1,40 @@
-import Image from "next/image";
+"use client";
 
+import Image from "next/image";
+import { useState } from "react";
+
+import { MoodLogDialog } from "./mood-log-dialog";
 import { MoodTrendChart } from "./mood-trend-chart";
 import {
-  currentEntry,
-  currentMoodQuote,
+  calculateMockAverages,
   mockAverages,
   moodIconNames,
   moodLabels,
+  moodQuotes,
   recentEntries,
+  sleepLabels,
   type MockAverage,
+  type MockMoodEntry,
 } from "./mock-data";
 
 const cardClass = "rounded-2xl border border-blue-100 bg-white";
+// The mock session follows the calendar day shown by the supplied design.
+const today = "2025-04-16";
 
 export function Dashboard() {
+  const [entries, setEntries] = useState<MockMoodEntry[]>(() => [...recentEntries]);
+  const [currentEntry, setCurrentEntry] = useState<MockMoodEntry | null>(null);
+  const [isLogging, setIsLogging] = useState(false);
+  const averages = currentEntry ? calculateMockAverages(entries) : mockAverages;
+
+  function logEntry(entry: MockMoodEntry) {
+    const updatedEntries = [...entries.filter((item) => item.entryDate !== entry.entryDate), entry]
+      .sort((left, right) => left.entryDate.localeCompare(right.entryDate))
+      .slice(-11);
+    setEntries(updatedEntries);
+    setCurrentEntry(entry);
+  }
+
   return (
     <div>
       <section className="text-center">
@@ -28,35 +49,55 @@ export function Dashboard() {
         </p>
       </section>
 
-      <section aria-label="Today's mood" className="mt-12 grid gap-5 lg:mt-16 lg:grid-cols-[670px_1fr] lg:gap-8">
-        <MoodCard />
-        <div className="grid gap-5 lg:grid-rows-[123px_197px]">
-          <SleepCard />
-          <ReflectionCard />
+      {currentEntry ? (
+        <section aria-label="Today's mood" className="mt-12 grid gap-5 lg:mt-16 lg:grid-cols-[670px_1fr] lg:gap-8">
+          <MoodCard entry={currentEntry} />
+          <div className="grid gap-5 lg:grid-rows-[123px_197px]">
+            <SleepCard entry={currentEntry} />
+            <ReflectionCard entry={currentEntry} />
+          </div>
+        </section>
+      ) : (
+        <div className="mt-12 flex justify-center lg:mt-16">
+          <button
+            type="button"
+            className="h-[60px] rounded-xl bg-brand px-8 text-[20px] font-semibold text-white outline-none hover:bg-[#3451c7] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 focus-visible:ring-offset-[#f5f5ff]"
+            onClick={() => setIsLogging(true)}
+          >
+            Log today&apos;s mood
+          </button>
         </div>
+      )}
+
+      <section className={`${currentEntry ? "mt-8" : "mt-16"} grid gap-8 lg:grid-cols-[370px_1fr]`}>
+        <AveragesCard averages={averages} />
+        <MoodTrendChart entries={entries} />
       </section>
 
-      <section className="mt-8 grid gap-8 lg:grid-cols-[370px_1fr]">
-        <AveragesCard />
-        <MoodTrendChart entries={recentEntries} />
-      </section>
+      {isLogging && !currentEntry && (
+        <MoodLogDialog
+          entryDate={today}
+          onClose={() => setIsLogging(false)}
+          onSubmit={logEntry}
+        />
+      )}
     </div>
   );
 }
 
-function MoodCard() {
+function MoodCard({ entry }: { entry: MockMoodEntry }) {
   return (
     <article className={`${cardClass} relative h-[507px] overflow-hidden shadow-[0_0_20px_rgba(1,5,39,0.08)] sm:h-[340px]`}>
       <div className="absolute left-4 top-8 z-10 text-left sm:left-8">
         <h2 className="text-[32px] font-bold leading-[45px] text-navy">I’m feeling</h2>
         <p className="text-[40px] font-bold leading-[48px] tracking-[-1.2px] text-navy">
-          {moodLabels[currentEntry.mood]}
+          {moodLabels[entry.mood]}
         </p>
       </div>
 
       <div className="absolute left-1/2 top-[157px] size-[200px] -translate-x-1/2 sm:left-auto sm:right-10 sm:top-[50px] sm:size-[320px] sm:translate-x-0 lg:right-10">
         <Image
-          src={`/images/icon-${moodIconNames[currentEntry.mood]}-color.svg`}
+          src={`/images/icon-${moodIconNames[entry.mood]}-color.svg`}
           alt=""
           fill
           sizes="(max-width: 639px) 200px, 320px"
@@ -72,25 +113,27 @@ function MoodCard() {
           height={24}
           className="mx-auto mb-4 sm:mx-0 sm:mb-3"
         />
-        “{currentMoodQuote}”
+        “{moodQuotes[entry.mood][0]}”
       </blockquote>
     </article>
   );
 }
 
-function SleepCard() {
+function SleepCard({ entry }: { entry: MockMoodEntry }) {
   return (
     <article className={`${cardClass} h-[123px] p-5`}>
       <div className="flex items-center gap-3 text-[18px] leading-[22px] text-navy-muted">
         <Image src="/images/icon-sleep.svg" alt="" width={22} height={22} />
         <h2>Sleep</h2>
       </div>
-      <p className="mt-4 text-[32px] font-bold leading-[45px] text-navy">9+ hours</p>
+      <p className="mt-4 text-[32px] font-bold leading-[45px] text-navy">
+        {sleepLabels[entry.sleepHours].toLowerCase()}
+      </p>
     </article>
   );
 }
 
-function ReflectionCard() {
+function ReflectionCard({ entry }: { entry: MockMoodEntry }) {
   return (
     <article className={`${cardClass} flex h-[197px] flex-col p-5`}>
       <div className="flex items-center gap-3 text-[18px] leading-[22px] text-navy-muted">
@@ -98,33 +141,33 @@ function ReflectionCard() {
         <h2>Reflection of the day</h2>
       </div>
       <p className="mt-4 text-[18px] font-medium leading-[24px] text-navy">
-        {currentEntry.journalEntry}
+        {entry.journalEntry}
       </p>
       <p className="mt-auto text-[18px] italic leading-[23px] text-navy-muted">
-        {currentEntry.feelings.map((feeling) => `#${feeling}`).join("  ")}
+        {entry.feelings.map((feeling) => `#${feeling}`).join("  ")}
       </p>
     </article>
   );
 }
 
-function AveragesCard() {
+function AveragesCard({ averages }: { averages: { mood: MockAverage; sleep: MockAverage } }) {
   return (
     <section aria-label="Mood and sleep averages" className={`${cardClass} h-[444px] p-4 sm:h-[452px] sm:p-6 lg:h-[453px]`}>
       <AverageBlock
         title="Average Mood"
-        value={mockAverages.mood.value}
+        value={averages.mood.value}
         icon="/images/icon-neutral-white.svg"
-        trendIcon={trendIcon(mockAverages.mood.trend)}
-        trend={trendCopy(mockAverages.mood.trend)}
+        trendIcon={trendIcon(averages.mood.trend)}
+        trend={trendCopy(averages.mood.trend)}
         background="#89caff"
         dark
       />
       <AverageBlock
         title="Average Sleep"
-        value={mockAverages.sleep.value}
+        value={averages.sleep.value}
         icon="/images/icon-sleep.svg"
-        trendIcon={trendIcon(mockAverages.sleep.trend)}
-        trend={trendCopy(mockAverages.sleep.trend)}
+        trendIcon={trendIcon(averages.sleep.trend)}
+        trend={trendCopy(averages.sleep.trend)}
         background="#4865db"
       />
     </section>

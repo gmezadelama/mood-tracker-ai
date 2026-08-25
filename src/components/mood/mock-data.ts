@@ -22,6 +22,44 @@ export const currentEntry: MockMoodEntry = {
 export const currentMoodQuote =
   "When your heart is full, share your light with the world.";
 
+export const moodQuotes: Record<MockMood, readonly string[]> = {
+  [-2]: [
+    "You are stronger than you think; the storm will pass.",
+    "It's okay to cry. Healing begins when you let your feelings flow.",
+    "Even in darkness, a spark of hope can shine bright.",
+    "This moment is tough, but you've overcome challenges before.",
+    "A gentle step forward, no matter how small, is still progress.",
+  ],
+  [-1]: [
+    "Pain is temporary, brighter days lie ahead.",
+    "Each setback is a chance to grow and learn.",
+    "One small positive thought can change your entire day.",
+    "It's okay to rest; self-care isn't selfish.",
+    "Healing takes time - be patient and kind to yourself.",
+  ],
+  0: [
+    "A calm mind can find opportunity in every moment.",
+    "Sometimes the greatest triumph is simply finding peace.",
+    "Take a moment to breathe; every breath is a fresh start.",
+    "Even an ordinary day can hold a pleasant surprise.",
+    "Balance isn't found, it's created.",
+  ],
+  1: [
+    "Happiness grows when it's shared with others.",
+    "Celebrate even the small victories to make life extraordinary.",
+    "Gratitude can turn what you have into enough.",
+    "Keep smiling; your joy can be contagious.",
+    "Where focus goes, energy flows - keep your focus on what lifts you.",
+  ],
+  2: [
+    currentMoodQuote,
+    "Savor the highs in life; they become precious memories.",
+    "Joy multiplies when spread among friends.",
+    "Trust your journey; you're in a beautiful place right now.",
+    "Let your happiness ripple out and inspire others.",
+  ],
+};
+
 export const recentEntries: MockMoodEntry[] = [
   {
     id: "2025-03-31",
@@ -130,7 +168,7 @@ export const moodIconNames: Record<MockMood, string> = {
   2: "very-happy",
 };
 
-const sleepLabels: Record<MockSleepRange, string> = {
+export const sleepLabels: Record<MockSleepRange, string> = {
   1: "0-2 Hours",
   3.5: "3-4 Hours",
   5.5: "5-6 Hours",
@@ -162,11 +200,16 @@ function closestSleepRange(value: number): MockSleepRange {
   );
 }
 
-export function calculateMockAverages(entries: MockMoodEntry[]): {
+export function calculateMockAverages(
+  entries: MockMoodEntry[],
+  excludedEntryId?: string,
+): {
   mood: MockAverage;
   sleep: MockAverage;
 } {
-  const completedEntries = entries.filter((entry) => entry.id !== currentEntry.id);
+  const completedEntries = excludedEntryId
+    ? entries.filter((entry) => entry.id !== excludedEntryId)
+    : entries;
   const latest = completedEntries.slice(-5);
   const previous = completedEntries.slice(-10, -5);
   const latestMood = mean(latest.map((entry) => entry.mood));
@@ -186,4 +229,4 @@ export function calculateMockAverages(entries: MockMoodEntry[]): {
   };
 }
 
-export const mockAverages = calculateMockAverages(recentEntries);
+export const mockAverages = calculateMockAverages(recentEntries, currentEntry.id);
