@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -36,8 +37,27 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${redditSans.variable} h-full antialiased`}>
-      <body className="min-h-full font-sans">{children}</body>
-    </html>
+    <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      localization={{
+        signIn: {
+          start: {
+            title: "Welcome back!",
+            subtitle: "Log in to continue tracking your mood and sleep.",
+          },
+        },
+        signUp: {
+          start: {
+            title: "Create an account",
+            subtitle: "Join to track your daily mood and sleep with ease.",
+          },
+        },
+      }}
+    >
+      <html lang="en" className={`${redditSans.variable} h-full antialiased`}>
+        <body className="min-h-full font-sans">{children}</body>
+      </html>
+    </ClerkProvider>
   );
 }
