@@ -1,9 +1,19 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import Home from "./page";
+import { HomeView } from "@/components/home-view";
+
+// UserButton requires a real ClerkProvider context; this test only cares
+// about the dashboard content, so stub it with a plain accessible button.
+vi.mock("@clerk/nextjs", () => ({
+  UserButton: () => <button type="button" aria-label="Open profile menu" />,
+}));
 
 afterEach(cleanup);
+
+function Home() {
+  return <HomeView displayName="Lisa" />;
+}
 
 describe("Home", () => {
   it("renders the dashboard in the no-check-in state", () => {

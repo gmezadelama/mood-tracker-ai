@@ -21,7 +21,7 @@ const cardClass = "rounded-2xl border border-blue-100 bg-white";
 // The mock session follows the calendar day shown by the supplied design.
 const today = "2025-04-16";
 
-export function Dashboard() {
+export function Dashboard({ displayName }: { displayName: string }) {
   const [entries, setEntries] = useState<MockMoodEntry[]>(() => [...recentEntries]);
   const [currentEntry, setCurrentEntry] = useState<MockMoodEntry | null>(null);
   const [isLogging, setIsLogging] = useState(false);
@@ -39,7 +39,7 @@ export function Dashboard() {
     <div>
       <section className="text-center">
         <p className="text-[24px] font-bold leading-[36px] text-brand sm:text-[30px] sm:leading-[45px]">
-          Hello, Lisa!
+          Hello, {displayName}!
         </p>
         <h1 className="mx-auto mt-4 max-w-[650px] text-[46px] font-bold leading-[1.18] tracking-[-2px] text-navy max-sm:text-[40px] max-sm:leading-[1.38] max-sm:tracking-[-1.2px] sm:mt-[10px] sm:leading-[73px] lg:text-[52px]">
           How are you feeling today?

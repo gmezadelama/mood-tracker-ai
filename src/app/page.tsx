@@ -1,13 +1,20 @@
-import { Dashboard } from "@/components/mood/dashboard";
-import { SiteHeader } from "@/components/site-header";
+import { redirect } from "next/navigation";
 
-export default function HomePage() {
-  return (
-    <main className="min-h-screen overflow-hidden px-4 pb-16 sm:px-8 sm:pb-20">
-      <div className="mx-auto w-full max-w-[1170px]">
-        <SiteHeader />
-        <Dashboard />
-      </div>
-    </main>
-  );
+import { HomeView } from "@/components/home-view";
+import { UnauthenticatedError } from "@/server/errors";
+import { getCurrentUser } from "@/server/current-user";
+
+export default async function HomePage() {
+  let user;
+  try {
+    user = await getCurrentUser();
+  } catch (error) {
+    if (error instanceof UnauthenticatedError) {
+      // Defensive fallback; proxy.ts already protects this route.
+      redirect("/sign-in");
+    }
+    throw error;
+  }
+
+  return <HomeView displayName={user.displayName} />;
 }
