@@ -46,6 +46,7 @@ export function MoodLogDialog({
   onSubmit: (entry: MockMoodEntry) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const stepHeadingRef = useRef<HTMLElement>(null);
   const titleId = useId();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(initialDraft);
@@ -60,6 +61,10 @@ export function MoodLogDialog({
     }
     dialog.focus();
   }, []);
+
+  useEffect(() => {
+    if (step > 0) stepHeadingRef.current?.focus();
+  }, [step]);
 
   function close() {
     const dialog = dialogRef.current;
@@ -149,7 +154,7 @@ export function MoodLogDialog({
         <button
           type="button"
           aria-label="Close mood logging"
-          className="absolute right-5 top-5 grid size-10 place-items-center rounded-full text-[30px] leading-none text-navy-muted outline-none hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-brand sm:right-6 sm:top-5"
+          className="fixed right-5 top-5 z-10 grid size-10 place-items-center rounded-full bg-[#f5f5ff]/95 text-[30px] leading-none text-navy-muted outline-none hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-brand sm:absolute sm:right-6 sm:top-5 sm:bg-transparent"
           onClick={close}
         >
           ×
@@ -200,7 +205,11 @@ export function MoodLogDialog({
 
           {step === 1 && (
             <fieldset aria-describedby={error ? `${titleId}-error` : undefined}>
-              <legend className="text-[28px] font-bold leading-[38px] sm:text-[32px] sm:leading-[45px]">
+              <legend
+                ref={(element) => { stepHeadingRef.current = element; }}
+                tabIndex={-1}
+                className="text-[28px] font-bold leading-[38px] outline-none sm:text-[32px] sm:leading-[45px]"
+              >
                 How did you feel?
               </legend>
               <p className="mt-1 text-[18px] leading-[22px] text-navy-muted">Select up to three tags:</p>
@@ -225,7 +234,12 @@ export function MoodLogDialog({
 
           {step === 2 && (
             <div>
-              <label htmlFor={`${titleId}-journal`} className="block text-[28px] font-bold leading-[38px] sm:text-[32px] sm:leading-[45px]">
+              <label
+                ref={(element) => { stepHeadingRef.current = element; }}
+                tabIndex={-1}
+                htmlFor={`${titleId}-journal`}
+                className="block text-[28px] font-bold leading-[38px] outline-none sm:text-[32px] sm:leading-[45px]"
+              >
                 Write about your day...
               </label>
               <textarea
@@ -248,7 +262,11 @@ export function MoodLogDialog({
 
           {step === 3 && (
             <fieldset aria-describedby={error ? `${titleId}-error` : undefined}>
-              <legend className="mb-8 max-w-[500px] text-[28px] font-bold leading-[38px] sm:text-[32px] sm:leading-[45px]">
+              <legend
+                ref={(element) => { stepHeadingRef.current = element; }}
+                tabIndex={-1}
+                className="mb-8 max-w-[500px] text-[28px] font-bold leading-[38px] outline-none sm:text-[32px] sm:leading-[45px]"
+              >
                 How many hours did you sleep today?
               </legend>
               <div className="grid gap-3">

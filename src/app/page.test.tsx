@@ -46,6 +46,7 @@ describe("Home", () => {
 
     fireEvent.click(within(dialog).getByRole("radio", { name: "Very Sad" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
+    expect(within(dialog).getByText("How did you feel?")).toHaveFocus();
 
     for (const feeling of ["Joyful", "Calm", "Hopeful"]) {
       fireEvent.click(within(dialog).getByRole("checkbox", { name: feeling }));
@@ -56,6 +57,7 @@ describe("Home", () => {
     );
     expect(within(dialog).getByRole("checkbox", { name: "Restless" })).not.toBeChecked();
     fireEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
+    expect(within(dialog).getByText("Write about your day...")).toHaveFocus();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
     expect(within(dialog).getByRole("alert")).toHaveTextContent(
