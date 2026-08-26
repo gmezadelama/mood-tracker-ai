@@ -14,6 +14,9 @@ export interface AppUser {
   avatarUrl: string | null;
 }
 
+// Matches users.display_name's varchar(100) limit (src/db/schema.ts).
+const DISPLAY_NAME_MAX_LENGTH = 100;
+
 /**
  * Resolves the internal application user for the current request, creating
  * it on first authenticated use. This is the only place in the app that
@@ -42,7 +45,8 @@ function deriveDisplayName(clerkUser: {
   firstName: string | null;
   username: string | null;
 }): string {
-  return clerkUser.fullName || clerkUser.firstName || clerkUser.username || "Mood Tracker User";
+  const name = clerkUser.fullName || clerkUser.firstName || clerkUser.username || "Mood Tracker User";
+  return name.slice(0, DISPLAY_NAME_MAX_LENGTH);
 }
 
 async function findOrCreateAppUser(

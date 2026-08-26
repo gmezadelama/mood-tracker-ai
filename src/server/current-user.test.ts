@@ -7,12 +7,16 @@ interface FakeUserRow {
   avatarUrl: string | null;
 }
 
-const { rows, resetRows, currentUserMock } = vi.hoisted(() => {
+const { rows, resetRows, currentUserMock, onInsertAttempt } = vi.hoisted(() => {
   const rows: FakeUserRow[] = [];
   return {
     rows,
     resetRows: () => rows.splice(0, rows.length),
     currentUserMock: vi.fn(),
+    // Lets a test inject a "concurrent" row exactly when an insert is
+    // attempted, simulating another request's write landing in between
+    // this request's initial lookup and its own insert.
+    onInsertAttempt: { current: null as (() => void) | null },
   };
 });
 
@@ -47,6 +51,8 @@ vi.mock("@/db", () => ({
       values: (value: Omit<FakeUserRow, "id">) => ({
         onConflictDoNothing: () => ({
           returning: async () => {
+            onInsertAttempt.current?.();
+            onInsertAttempt.current = null;
             if (rows.some((row) => row.clerkUserId === value.clerkUserId)) {
               return [];
             }
@@ -91,6 +97,7 @@ describe("getCurrentUser", () => {
   beforeEach(() => {
     resetRows();
     nextId = 1;
+    onInsertAttempt.current = null;
     currentUserMock.mockReset();
     vi.stubEnv("NODE_ENV", "test");
   });
@@ -150,16 +157,28 @@ describe("getCurrentUser", () => {
   });
 
   it("re-reads the existing row instead of surfacing a concurrent-creation conflict", async () => {
-    // Simulates a second request racing the first: the row already exists
-    // by the time this insert attempt runs, so onConflictDoNothing yields
-    // no returned row and the code must fall back to a read.
-    rows.push({ id: 1, clerkUserId: "clerk_1", displayName: "Ada Lovelace", avatarUrl: null });
+    // The initial lookup finds nothing, so an insert is attempted. Right as
+    // that insert runs, a concurrent request's row "appears" — the insert
+    // sees the conflict, onConflictDoNothing yields no returned row, and
+    // the code must fall back to a second read to find it.
     mockClerkUser({ id: "clerk_1", fullName: "Ada Lovelace" });
+    onInsertAttempt.current = () => {
+      rows.push({ id: 1, clerkUserId: "clerk_1", displayName: "Ada Lovelace", avatarUrl: null });
+    };
 
     const user = await getCurrentUser();
 
     expect(user).toEqual({ id: 1, displayName: "Ada Lovelace", avatarUrl: null });
     expect(rows).toHaveLength(1);
+  });
+
+  it("truncates a display name longer than the database's varchar(100) limit", async () => {
+    mockClerkUser({ id: "clerk_1", fullName: "A".repeat(150) });
+
+    const user = await getCurrentUser();
+
+    expect(user.displayName).toHaveLength(100);
+    expect(user.displayName).toBe("A".repeat(100));
   });
 
   it("falls back to a safe display name when Clerk has no name data", async () => {
@@ -205,6 +224,7 @@ describe("resolveCurrentUserId", () => {
   beforeEach(() => {
     resetRows();
     nextId = 1;
+    onInsertAttempt.current = null;
     currentUserMock.mockReset();
     vi.stubEnv("NODE_ENV", "test");
   });
