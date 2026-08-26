@@ -44,7 +44,7 @@ export function MoodTrendChart({ entries }: { entries: MockMoodEntry[] }) {
   useEffect(() => {
     const region = scrollRegionRef.current;
     if (region) region.scrollLeft = region.scrollWidth;
-  }, []);
+  }, [entries.length]);
 
   return (
     <section className="h-[420px] rounded-2xl border border-blue-100 bg-white px-4 py-5 sm:h-[437px] sm:px-6 sm:py-6 lg:h-[453px] lg:px-8 lg:py-8">
@@ -52,30 +52,35 @@ export function MoodTrendChart({ entries }: { entries: MockMoodEntry[] }) {
         Mood and sleep trends
       </h2>
 
-      <div className="mt-8 flex h-[312px] sm:mt-8">
-        <div aria-hidden="true" className="relative z-10 h-[264px] w-[68px] shrink-0 bg-white text-[12px] text-navy-muted">
-          {[5, 4, 3, 2, 1].map((level, index) => (
-            <div
-              key={level}
-              className="absolute left-0 flex h-[13px] items-center gap-1 whitespace-nowrap"
-              style={{ top: index * 53 }}
-            >
-              <span className="w-3 text-[10px] font-bold">ᶻᶻ</span>
-              <span>{sleepLabels[level]}</span>
-            </div>
-          ))}
+      {entries.length === 0 ? (
+        <div className="grid h-[312px] place-items-center text-center text-[18px] text-navy-muted">
+          <p>No check-ins yet. Log your first mood to start the trend chart.</p>
         </div>
+      ) : (
+        <div className="mt-8 flex h-[312px] sm:mt-8">
+          <div aria-hidden="true" className="relative z-10 h-[264px] w-[68px] shrink-0 bg-white text-[12px] text-navy-muted">
+            {[5, 4, 3, 2, 1].map((level, index) => (
+              <div
+                key={level}
+                className="absolute left-0 flex h-[13px] items-center gap-1 whitespace-nowrap"
+                style={{ top: index * 53 }}
+              >
+                <span className="w-3 text-[10px] font-bold">ᶻᶻ</span>
+                <span>{sleepLabels[level]}</span>
+              </div>
+            ))}
+          </div>
 
-        <div className="relative min-w-0 flex-1">
-          <div
-            ref={scrollRegionRef}
-            aria-label="Mood and sleep chart. Scroll horizontally to view earlier entries."
-            className="h-[307px] overflow-x-auto overflow-y-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-            role="region"
-            tabIndex={0}
-          >
-            <div aria-hidden="true" className="h-[307px] w-[626px]">
-              <BarChart width={626} height={307} data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+          <div className="relative min-w-0 flex-1">
+            <div
+              ref={scrollRegionRef}
+              aria-label="Mood and sleep chart. Scroll horizontally to view earlier entries."
+              className="h-[307px] overflow-x-auto overflow-y-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              role="region"
+              tabIndex={0}
+            >
+              <div aria-hidden="true" className="h-[307px] w-[626px]">
+                <BarChart width={626} height={307} data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <CartesianGrid
                 horizontal
                 vertical={false}
@@ -99,12 +104,13 @@ export function MoodTrendChart({ entries }: { entries: MockMoodEntry[] }) {
                 shape={<MoodBar />}
                 isAnimationActive={false}
               />
-              </BarChart>
+                </BarChart>
+              </div>
             </div>
+            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-white to-transparent lg:hidden" />
           </div>
-          <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-white to-transparent lg:hidden" />
         </div>
-      </div>
+      )}
 
       <ul className="sr-only" aria-label="Recent mood and sleep history">
         {entries.map((entry) => (

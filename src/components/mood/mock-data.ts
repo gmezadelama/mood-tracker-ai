@@ -10,15 +10,6 @@ export interface MockMoodEntry {
   sleepHours: MockSleepRange;
 }
 
-export const currentEntry: MockMoodEntry = {
-  id: "2025-04-15",
-  entryDate: "2025-04-15",
-  mood: 2,
-  feelings: ["Grateful", "Optimistic"],
-  journalEntry: "Woke up early and finally tackled a big project!",
-  sleepHours: 9,
-};
-
 export const currentMoodQuote =
   "When your heart is full, share your light with the world.";
 
@@ -60,90 +51,6 @@ export const moodQuotes: Record<MockMood, readonly string[]> = {
   ],
 };
 
-export const recentEntries: MockMoodEntry[] = [
-  {
-    id: "2025-03-31",
-    entryDate: "2025-03-31",
-    mood: -1,
-    feelings: ["Disappointed", "Frustrated"],
-    journalEntry: "Got some bad news. Trying to process my emotions.",
-    sleepHours: 5.5,
-  },
-  {
-    id: "2025-04-02",
-    entryDate: "2025-04-02",
-    mood: 1,
-    feelings: ["Excited", "Content"],
-    journalEntry: "A good friend visited, which lifted my spirits a lot.",
-    sleepHours: 7.5,
-  },
-  {
-    id: "2025-04-04",
-    entryDate: "2025-04-04",
-    mood: -2,
-    feelings: ["Overwhelmed", "Lonely"],
-    journalEntry: "Feeling isolated. Need to talk to someone soon.",
-    sleepHours: 3.5,
-  },
-  {
-    id: "2025-04-06",
-    entryDate: "2025-04-06",
-    mood: 0,
-    feelings: ["Irritable"],
-    journalEntry: "Woke up grouchy, but it got better by evening.",
-    sleepHours: 5.5,
-  },
-  {
-    id: "2025-04-07",
-    entryDate: "2025-04-07",
-    mood: 1,
-    feelings: ["Optimistic", "Confident"],
-    journalEntry: "Good progress on personal goals today.",
-    sleepHours: 7.5,
-  },
-  {
-    id: "2025-04-09",
-    entryDate: "2025-04-09",
-    mood: 2,
-    feelings: ["Joyful", "Excited", "Grateful"],
-    journalEntry: "Woke up ready to tackle new challenges.",
-    sleepHours: 9,
-  },
-  {
-    id: "2025-04-10",
-    entryDate: "2025-04-10",
-    mood: -1,
-    feelings: ["Lonely", "Anxious"],
-    journalEntry: "Feeling a bit off. Hoping tomorrow is better.",
-    sleepHours: 3.5,
-  },
-  {
-    id: "2025-04-12",
-    entryDate: "2025-04-12",
-    mood: 0,
-    feelings: ["Calm"],
-    journalEntry: "Quiet day at home, reading and resting.",
-    sleepHours: 7.5,
-  },
-  {
-    id: "2025-04-13",
-    entryDate: "2025-04-13",
-    mood: 1,
-    feelings: ["Optimistic", "Confident"],
-    journalEntry: "Had a productive morning cleaning and organizing.",
-    sleepHours: 7.5,
-  },
-  {
-    id: "2025-04-14",
-    entryDate: "2025-04-14",
-    mood: -2,
-    feelings: ["Down", "Tired"],
-    journalEntry: "Rough night of sleep. Need support and rest.",
-    sleepHours: 3.5,
-  },
-  currentEntry,
-];
-
 export const moodColors: Record<MockMood, string> = {
   [-2]: "#ff9b99",
   [-1]: "#b8b1ff",
@@ -181,6 +88,7 @@ type Trend = "increase" | "decrease" | "same";
 export interface MockAverage {
   value: string;
   trend: Trend;
+  comparison?: string;
 }
 
 function compare(current: number, previous: number): Trend {
@@ -212,21 +120,41 @@ export function calculateMockAverages(
     : entries;
   const latest = completedEntries.slice(-5);
   const previous = completedEntries.slice(-10, -5);
+  if (latest.length === 0) {
+    return {
+      mood: {
+        value: "No data yet",
+        trend: "same",
+        comparison: "Log your first check-in",
+      },
+      sleep: {
+        value: "No data yet",
+        trend: "same",
+        comparison: "Log your first check-in",
+      },
+    };
+  }
+
   const latestMood = mean(latest.map((entry) => entry.mood));
-  const previousMood = mean(previous.map((entry) => entry.mood));
   const latestSleep = mean(latest.map((entry) => entry.sleepHours));
-  const previousSleep = mean(previous.map((entry) => entry.sleepHours));
+  const insufficientHistory = previous.length === 0;
+  const previousMood = insufficientHistory
+    ? latestMood
+    : mean(previous.map((entry) => entry.mood));
+  const previousSleep = insufficientHistory
+    ? latestSleep
+    : mean(previous.map((entry) => entry.sleepHours));
 
   return {
     mood: {
       value: moodLabels[Math.round(latestMood) as MockMood],
       trend: compare(Math.round(latestMood), Math.round(previousMood)),
+      comparison: insufficientHistory ? "Keep tracking to see trends" : undefined,
     },
     sleep: {
       value: sleepLabels[closestSleepRange(latestSleep)],
-      trend: compare(latestSleep, previousSleep),
+      trend: insufficientHistory ? "same" : compare(latestSleep, previousSleep),
+      comparison: insufficientHistory ? "Keep tracking to see trends" : undefined,
     },
   };
 }
-
-export const mockAverages = calculateMockAverages(recentEntries, currentEntry.id);

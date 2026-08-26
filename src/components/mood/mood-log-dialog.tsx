@@ -14,9 +14,9 @@ import {
   moodLabels,
   sleepLabels,
   type MockMood,
-  type MockMoodEntry,
   type MockSleepRange,
 } from "./mock-data";
+import type { MoodEntryDraft } from "./mood-api";
 
 const JOURNAL_LIMIT = 150;
 const moods: MockMood[] = [2, 1, 0, -1, -2];
@@ -43,7 +43,7 @@ export function MoodLogDialog({
 }: {
   entryDate: string;
   onClose: () => void;
-  onSubmit: (entry: MockMoodEntry) => void;
+  onSubmit: (entry: MoodEntryDraft) => Promise<void>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const stepHeadingRef = useRef<HTMLElement>(null);
@@ -51,6 +51,7 @@ export function MoodLogDialog({
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(initialDraft);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -67,6 +68,11 @@ export function MoodLogDialog({
   }, [step]);
 
   function close() {
+    if (isSubmitting) return;
+    closeDialog();
+  }
+
+  function closeDialog() {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (typeof dialog.close === "function") dialog.close();
@@ -93,20 +99,31 @@ export function MoodLogDialog({
     setStep((current) => current + 1);
   }
 
-  function submit() {
+  async function submit() {
     if (draft.sleepHours === null || draft.mood === null) {
       setError("Please enter how many hours you slept.");
       return;
     }
-    onSubmit({
-      id: entryDate,
-      entryDate,
-      mood: draft.mood,
-      feelings: draft.feelings,
-      journalEntry: draft.journalEntry.trim(),
-      sleepHours: draft.sleepHours,
-    });
-    close();
+    setError("");
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        entryDate,
+        mood: draft.mood,
+        feelings: draft.feelings,
+        journalEntry: draft.journalEntry.trim(),
+        sleepHours: draft.sleepHours,
+      });
+      setIsSubmitting(false);
+      closeDialog();
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "We couldn't save your check-in. Please try again.",
+      );
+      setIsSubmitting(false);
+    }
   }
 
   function toggleFeeling(feeling: Feeling) {
@@ -137,13 +154,13 @@ export function MoodLogDialog({
       tabIndex={-1}
       onCancel={(event) => {
         event.preventDefault();
-        close();
+        if (!isSubmitting) close();
       }}
       onClose={onClose}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
-          close();
+          if (!isSubmitting) close();
         }
       }}
     >
@@ -156,6 +173,7 @@ export function MoodLogDialog({
           aria-label="Close mood logging"
           className="fixed right-5 top-5 z-10 grid size-10 place-items-center rounded-full bg-[#f5f5ff]/95 text-[30px] leading-none text-navy-muted outline-none hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-brand sm:absolute sm:right-6 sm:top-5 sm:bg-transparent"
           onClick={close}
+          disabled={isSubmitting}
         >
           ×
         </button>
@@ -299,10 +317,12 @@ export function MoodLogDialog({
           )}
           <button
             type="button"
+            aria-busy={isSubmitting}
+            disabled={isSubmitting}
             className="h-[60px] w-full rounded-xl bg-brand text-[20px] font-semibold text-white outline-none hover:bg-[#3451c7] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             onClick={step === 3 ? submit : advance}
           >
-            {step === 3 ? "Submit" : "Continue"}
+            {step === 3 ? (isSubmitting ? "Saving..." : "Submit") : "Continue"}
           </button>
         </div>
       </div>

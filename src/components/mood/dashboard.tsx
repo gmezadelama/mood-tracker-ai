@@ -1,38 +1,91 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { MoodLogDialog } from "./mood-log-dialog";
 import { MoodTrendChart } from "./mood-trend-chart";
 import {
   calculateMockAverages,
-  mockAverages,
   moodIconNames,
   moodLabels,
   moodQuotes,
-  recentEntries,
   sleepLabels,
   type MockAverage,
   type MockMoodEntry,
 } from "./mock-data";
+import { createMoodEntry, fetchMoodEntries, MoodApiError, type MoodEntryDraft } from "./mood-api";
 
 const cardClass = "rounded-2xl border border-blue-100 bg-white";
-// The mock session follows the calendar day shown by the supplied design.
-const today = "2025-04-16";
 
 export function Dashboard({ displayName }: { displayName: string }) {
-  const [entries, setEntries] = useState<MockMoodEntry[]>(() => [...recentEntries]);
-  const [currentEntry, setCurrentEntry] = useState<MockMoodEntry | null>(null);
+  const [entries, setEntries] = useState<MockMoodEntry[]>([]);
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [today] = useState(() => localDateString(new Date()));
   const [isLogging, setIsLogging] = useState(false);
-  const averages = currentEntry ? calculateMockAverages(entries) : mockAverages;
+  const currentEntry = entries.find((entry) => entry.entryDate === today) ?? null;
+  const averages = calculateMockAverages(entries);
 
-  function logEntry(entry: MockMoodEntry) {
+  const loadEntries = useCallback(async (signal?: AbortSignal) => {
+    setLoadStatus("loading");
+    setLoadError("");
+    try {
+      setEntries(await fetchMoodEntries(signal));
+      setLoadStatus("ready");
+    } catch (error) {
+      if (!signal?.aborted) {
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "We couldn't load your mood history. Please try again.",
+        );
+        setLoadStatus("error");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchMoodEntries(controller.signal)
+      .then((loadedEntries) => {
+        setEntries(loadedEntries);
+        setLoadStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : "We couldn't load your mood history. Please try again.",
+          );
+          setLoadStatus("error");
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
+  async function logEntry(draft: MoodEntryDraft) {
+    try {
+      const entry = await createMoodEntry(draft);
+      reconcileEntry(entry);
+    } catch (error) {
+      if (error instanceof MoodApiError && error.status === 409) {
+        try {
+          setEntries(await fetchMoodEntries());
+        } catch {
+          // Keep the original conflict message; a normal retry remains available.
+        }
+      }
+      throw error;
+    }
+  }
+
+  function reconcileEntry(entry: MockMoodEntry) {
     const updatedEntries = [...entries.filter((item) => item.entryDate !== entry.entryDate), entry]
       .sort((left, right) => left.entryDate.localeCompare(right.entryDate))
       .slice(-11);
     setEntries(updatedEntries);
-    setCurrentEntry(entry);
   }
 
   return (
@@ -44,37 +97,60 @@ export function Dashboard({ displayName }: { displayName: string }) {
         <h1 className="mx-auto mt-4 max-w-[650px] text-[46px] font-bold leading-[1.18] tracking-[-2px] text-navy max-sm:text-[40px] max-sm:leading-[1.38] max-sm:tracking-[-1.2px] sm:mt-[10px] sm:leading-[73px] lg:text-[52px]">
           How are you feeling today?
         </h1>
-        <p className="mt-4 text-[18px] leading-[22px] text-navy-muted sm:mt-[10px]">
-          Wednesday, April 16th, 2025
+        <p suppressHydrationWarning className="mt-4 text-[18px] leading-[22px] text-navy-muted sm:mt-[10px]">
+          {formatDisplayDate(today)}
         </p>
       </section>
 
-      {currentEntry ? (
-        <section aria-label="Today's mood" className="mt-12 grid gap-5 lg:mt-16 lg:grid-cols-[670px_1fr] lg:gap-8">
-          <MoodCard entry={currentEntry} />
-          <div className="grid gap-5 lg:grid-rows-[123px_197px]">
-            <SleepCard entry={currentEntry} />
-            <ReflectionCard entry={currentEntry} />
-          </div>
-        </section>
-      ) : (
-        <div className="mt-12 flex justify-center lg:mt-16">
+      {loadStatus === "loading" && (
+        <div role="status" className={`${cardClass} mt-12 p-8 text-center text-[18px] text-navy-muted lg:mt-16`}>
+          Loading your mood history…
+        </div>
+      )}
+
+      {loadStatus === "error" && (
+        <div role="alert" className={`${cardClass} mt-12 p-8 text-center lg:mt-16`}>
+          <p className="text-[18px] text-navy-muted">{loadError}</p>
           <button
             type="button"
-            className="h-[60px] rounded-xl bg-brand px-8 text-[20px] font-semibold text-white outline-none hover:bg-[#3451c7] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 focus-visible:ring-offset-[#f5f5ff]"
-            onClick={() => setIsLogging(true)}
+            className="mt-5 h-12 rounded-xl bg-brand px-6 font-semibold text-white outline-none hover:bg-[#3451c7] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            onClick={() => void loadEntries()}
           >
-            Log today&apos;s mood
+            Try again
           </button>
         </div>
       )}
 
-      <section className={`${currentEntry ? "mt-8" : "mt-16"} grid gap-8 lg:grid-cols-[370px_1fr]`}>
-        <AveragesCard averages={averages} />
-        <MoodTrendChart entries={entries} />
-      </section>
+      {loadStatus === "ready" && (
+        <>
+          {currentEntry ? (
+            <section aria-label="Today's mood" className="mt-12 grid gap-5 lg:mt-16 lg:grid-cols-[670px_1fr] lg:gap-8">
+              <MoodCard entry={currentEntry} />
+              <div className="grid gap-5 lg:grid-rows-[123px_197px]">
+                <SleepCard entry={currentEntry} />
+                <ReflectionCard entry={currentEntry} />
+              </div>
+            </section>
+          ) : (
+            <div className="mt-12 flex justify-center lg:mt-16">
+              <button
+                type="button"
+                className="h-[60px] rounded-xl bg-brand px-8 text-[20px] font-semibold text-white outline-none hover:bg-[#3451c7] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 focus-visible:ring-offset-[#f5f5ff]"
+                onClick={() => setIsLogging(true)}
+              >
+                Log today&apos;s mood
+              </button>
+            </div>
+          )}
 
-      {isLogging && !currentEntry && (
+          <section className={`${currentEntry ? "mt-8" : "mt-16"} grid gap-8 lg:grid-cols-[370px_1fr]`}>
+            <AveragesCard averages={averages} />
+            <MoodTrendChart entries={entries} />
+          </section>
+        </>
+      )}
+
+      {isLogging && (
         <MoodLogDialog
           entryDate={today}
           onClose={() => setIsLogging(false)}
@@ -83,6 +159,22 @@ export function Dashboard({ displayName }: { displayName: string }) {
       )}
     </div>
   );
+}
+
+function localDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDisplayDate(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function MoodCard({ entry }: { entry: MockMoodEntry }) {
@@ -158,7 +250,7 @@ function AveragesCard({ averages }: { averages: { mood: MockAverage; sleep: Mock
         value={averages.mood.value}
         icon="/images/icon-neutral-white.svg"
         trendIcon={trendIcon(averages.mood.trend)}
-        trend={trendCopy(averages.mood.trend)}
+        trend={averages.mood.comparison ?? trendCopy(averages.mood.trend)}
         background="#89caff"
         dark
       />
@@ -167,7 +259,7 @@ function AveragesCard({ averages }: { averages: { mood: MockAverage; sleep: Mock
         value={averages.sleep.value}
         icon="/images/icon-sleep.svg"
         trendIcon={trendIcon(averages.sleep.trend)}
-        trend={trendCopy(averages.sleep.trend)}
+        trend={averages.sleep.comparison ?? trendCopy(averages.sleep.trend)}
         background="#4865db"
       />
     </section>
