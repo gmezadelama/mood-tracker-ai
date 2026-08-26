@@ -47,7 +47,7 @@ export function MoodTrendChart({ entries }: { entries: MockMoodEntry[] }) {
   }, [entries.length]);
 
   return (
-    <section className="h-[420px] rounded-2xl border border-blue-100 bg-white px-4 py-5 sm:h-[437px] sm:px-6 sm:py-6 lg:h-[453px] lg:px-8 lg:py-8">
+    <section className="h-[420px] min-w-0 rounded-2xl border border-blue-100 bg-white px-4 py-5 sm:h-[437px] sm:px-6 sm:py-6 lg:h-[453px] lg:px-8 lg:py-8">
       <h2 className="text-[28px] font-bold leading-9 tracking-[-0.8px] text-navy sm:text-[32px] sm:leading-[45px]">
         Mood and sleep trends
       </h2>
@@ -57,7 +57,7 @@ export function MoodTrendChart({ entries }: { entries: MockMoodEntry[] }) {
           <p>No check-ins yet. Log your first mood to start the trend chart.</p>
         </div>
       ) : (
-        <div className="mt-8 flex h-[312px] sm:mt-8">
+        <div className="mt-8 flex h-[312px] min-w-0 sm:mt-8">
           <div aria-hidden="true" className="relative z-10 h-[264px] w-[68px] shrink-0 bg-white text-[12px] text-navy-muted">
             {[5, 4, 3, 2, 1].map((level, index) => (
               <div

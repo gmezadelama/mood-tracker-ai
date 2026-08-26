@@ -143,7 +143,7 @@ export function Dashboard({ displayName }: { displayName: string }) {
             </div>
           )}
 
-          <section className={`${currentEntry ? "mt-8" : "mt-16"} grid gap-8 lg:grid-cols-[370px_1fr]`}>
+          <section className={`${currentEntry ? "mt-8" : "mt-16"} grid min-w-0 gap-8 lg:grid-cols-[370px_minmax(0,1fr)]`}>
             <AveragesCard averages={averages} />
             <MoodTrendChart entries={entries} />
           </section>

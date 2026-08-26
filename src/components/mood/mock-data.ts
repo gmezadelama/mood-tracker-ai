@@ -137,7 +137,7 @@ export function calculateMockAverages(
 
   const latestMood = mean(latest.map((entry) => entry.mood));
   const latestSleep = mean(latest.map((entry) => entry.sleepHours));
-  const insufficientHistory = previous.length === 0;
+  const insufficientHistory = previous.length < 5;
   const previousMood = insufficientHistory
     ? latestMood
     : mean(previous.map((entry) => entry.mood));

@@ -25,15 +25,18 @@ describe("calculateMockAverages", () => {
     expect(averages.mood.comparison).toBe("Log your first check-in");
   });
 
-  it.each([1, 4, 5])("handles %s entries without invalid values", (size) => {
+  it.each([1, 4, 5, 6, 7, 8, 9])("waits for two complete periods when given %s entries", (size) => {
     const averages = calculateMockAverages(entries(size));
 
     expect(averages.mood.value).not.toContain("undefined");
     expect(averages.sleep.value).not.toContain("undefined");
     expect(averages.mood.comparison).toBe("Keep tracking to see trends");
+    expect(averages.sleep.comparison).toBe("Keep tracking to see trends");
+    expect(averages.mood.trend).toBe("same");
+    expect(averages.sleep.trend).toBe("same");
   });
 
-  it.each([6, 10, 11])("compares available periods for %s entries", (size) => {
+  it.each([10, 11])("compares complete five-entry periods for %s entries", (size) => {
     const averages = calculateMockAverages(entries(size));
 
     expect(averages.mood.value).toMatch(/Very Sad|Sad|Neutral|Happy|Very Happy/);
