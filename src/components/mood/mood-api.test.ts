@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createMoodEntry, fetchMoodEntries } from "./mood-api";
+import { createMoodEntry, fetchMoodEntries, generateMoodRecommendations } from "./mood-api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -30,12 +30,36 @@ describe("mood API mapping", () => {
         apiEntry(2, "2026-01-16", "NINE_PLUS"),
         apiEntry(1, "2026-01-15", "ZERO_TO_TWO"),
       ],
+      aiQuotaRemaining: 4,
     })));
 
-    const entries = await fetchMoodEntries();
+    const { entries, aiQuotaRemaining } = await fetchMoodEntries();
 
     expect(entries.map((entry) => entry.entryDate)).toEqual(["2026-01-15", "2026-01-16"]);
     expect(entries.map((entry) => entry.sleepHours)).toEqual([1, 9]);
+    expect(aiQuotaRemaining).toBe(4);
+  });
+
+  it("defaults a missing aiRecommendation to null and passes through an existing one", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+      entries: [
+        apiEntry(1, "2026-01-15"),
+        {
+          ...apiEntry(2, "2026-01-16"),
+          aiRecommendation: { activities: ["Take a walk"], phrases: ["Be gentle."], createdAt: "2026-01-16T00:00:00.000Z" },
+        },
+      ],
+      aiQuotaRemaining: 5,
+    })));
+
+    const { entries } = await fetchMoodEntries();
+
+    expect(entries[0].aiRecommendation).toBeNull();
+    expect(entries[1].aiRecommendation).toEqual({
+      activities: ["Take a walk"],
+      phrases: ["Be gentle."],
+      createdAt: "2026-01-16T00:00:00.000Z",
+    });
   });
 
   it("maps chart sleep values back to categorical persistence values", async () => {
@@ -54,5 +78,37 @@ describe("mood API mapping", () => {
 
     const [, options] = fetchMock.mock.calls[0];
     expect(JSON.parse(String(options.body))).toMatchObject({ sleepRange: "FIVE_TO_SIX" });
+  });
+});
+
+describe("generateMoodRecommendations", () => {
+  it("posts to the entry-scoped endpoint and returns a ready result", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({
+      status: "ready",
+      recommendation: { activities: ["Take a walk"], phrases: ["Be gentle."], createdAt: "2026-01-15T00:00:00.000Z" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateMoodRecommendations("42");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/mood-entries/42/recommendations", { method: "POST" });
+    expect(result.status).toBe("ready");
+  });
+
+  it("passes through a quota_exhausted result without throwing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ status: "quota_exhausted" })));
+
+    const result = await generateMoodRecommendations("42");
+
+    expect(result).toEqual({ status: "quota_exhausted" });
+  });
+
+  it("throws a safe error message on a non-2xx response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ error: "forbidden" }, 403)));
+
+    await expect(generateMoodRecommendations("42")).rejects.toMatchObject({
+      status: 403,
+      message: "AI suggestions aren't available right now. Please try again later.",
+    });
   });
 });

@@ -6,7 +6,7 @@ import {
   type SleepRange,
 } from "@/domain/mood/constants";
 
-import type { MockMoodEntry, MockSleepRange } from "./mock-data";
+import type { AiRecommendation, MockMoodEntry, MockSleepRange } from "./mock-data";
 
 interface MoodEntryResponse {
   id: number;
@@ -17,10 +17,12 @@ interface MoodEntryResponse {
   sleepRange: SleepRange;
   createdAt: string;
   updatedAt: string;
+  aiRecommendation?: AiRecommendation | null;
 }
 
 interface MoodEntriesResponse {
   entries: MoodEntryResponse[];
+  aiQuotaRemaining: number;
 }
 
 interface MoodEntryCreatedResponse {
@@ -45,7 +47,12 @@ export class MoodApiError extends Error {
   }
 }
 
-export async function fetchMoodEntries(signal?: AbortSignal): Promise<MockMoodEntry[]> {
+export interface MoodHistory {
+  entries: MockMoodEntry[];
+  aiQuotaRemaining: number;
+}
+
+export async function fetchMoodEntries(signal?: AbortSignal): Promise<MoodHistory> {
   const response = await fetch("/api/mood-entries?limit=11", {
     cache: "no-store",
     signal,
@@ -53,9 +60,12 @@ export async function fetchMoodEntries(signal?: AbortSignal): Promise<MockMoodEn
   if (!response.ok) throw apiError(response.status, "load");
 
   const payload = (await response.json()) as MoodEntriesResponse;
-  return payload.entries
-    .map(mapMoodEntry)
-    .sort((left, right) => left.entryDate.localeCompare(right.entryDate));
+  return {
+    entries: payload.entries
+      .map(mapMoodEntry)
+      .sort((left, right) => left.entryDate.localeCompare(right.entryDate)),
+    aiQuotaRemaining: payload.aiQuotaRemaining,
+  };
 }
 
 export async function createMoodEntry(draft: MoodEntryDraft): Promise<MockMoodEntry> {
@@ -84,7 +94,26 @@ function mapMoodEntry(entry: MoodEntryResponse): MockMoodEntry {
     feelings: entry.feelings,
     journalEntry: entry.journalEntry,
     sleepHours: SLEEP_CHART_VALUES[entry.sleepRange],
+    // Absent (not `null`) on the create-entry response, since a
+    // just-created entry can't have one yet — normalize both to `null`.
+    aiRecommendation: entry.aiRecommendation ?? null,
   };
+}
+
+export type GenerateRecommendationsResult =
+  | { status: "ready"; recommendation: AiRecommendation }
+  | { status: "quota_exhausted" }
+  | { status: "unavailable" };
+
+export async function generateMoodRecommendations(
+  moodEntryId: string,
+): Promise<GenerateRecommendationsResult> {
+  const response = await fetch(`/api/mood-entries/${moodEntryId}/recommendations`, {
+    method: "POST",
+  });
+  if (!response.ok) throw apiError(response.status, "recommend");
+
+  return (await response.json()) as GenerateRecommendationsResult;
 }
 
 function sleepRangeForChartValue(value: MockSleepRange): SleepRange {
@@ -93,7 +122,7 @@ function sleepRangeForChartValue(value: MockSleepRange): SleepRange {
   return range;
 }
 
-function apiError(status: number, operation: "load" | "submit") {
+function apiError(status: number, operation: "load" | "submit" | "recommend") {
   if (status === 400) {
     return new MoodApiError(status, "Please review your check-in and try again.");
   }
@@ -102,6 +131,9 @@ function apiError(status: number, operation: "load" | "submit") {
   }
   if (status === 409) {
     return new MoodApiError(status, "You already logged a mood for today.");
+  }
+  if (operation === "recommend") {
+    return new MoodApiError(status, "AI suggestions aren't available right now. Please try again later.");
   }
   return new MoodApiError(
     status,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { attachAiMetadata } from "@/server/ai/recommendations";
 import { resolveCurrentUserId } from "@/server/current-user";
 import { ValidationError } from "@/server/errors";
 import { toErrorResponse } from "@/server/http";
@@ -28,7 +29,14 @@ export async function GET(request: NextRequest) {
     }
 
     const entries = await listRecentMoodEntries(userId, parsedQuery.data.limit);
-    return NextResponse.json({ entries });
+
+    // Additive-only enrichment (see src/server/ai/recommendations.ts):
+    // folds each entry's persisted AI recommendation (if any) and the
+    // user's remaining daily quota into this same response, so the
+    // dashboard's one existing list fetch is enough to render AI state
+    // too — no extra per-entry round trip.
+    const { entries: enrichedEntries, aiQuotaRemaining } = await attachAiMetadata(userId, entries);
+    return NextResponse.json({ entries: enrichedEntries, aiQuotaRemaining });
   } catch (error) {
     return toErrorResponse(error);
   }

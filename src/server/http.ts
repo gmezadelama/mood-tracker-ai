@@ -2,7 +2,13 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
-import { ConflictError, UnauthenticatedError, ValidationError } from "./errors";
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthenticatedError,
+  ValidationError,
+} from "./errors";
 
 export function toErrorResponse(error: unknown): NextResponse {
   if (error instanceof ValidationError) {
@@ -13,6 +19,12 @@ export function toErrorResponse(error: unknown): NextResponse {
   }
   if (error instanceof UnauthenticatedError) {
     return NextResponse.json({ error: error.message }, { status: 401 });
+  }
+  if (error instanceof ForbiddenError) {
+    return NextResponse.json({ error: error.message }, { status: 403 });
+  }
+  if (error instanceof NotFoundError) {
+    return NextResponse.json({ error: error.message }, { status: 404 });
   }
   if (error instanceof ConflictError) {
     return NextResponse.json({ error: error.message }, { status: 409 });

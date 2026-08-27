@@ -1,6 +1,12 @@
 export type MockMood = -2 | -1 | 0 | 1 | 2;
 export type MockSleepRange = 1 | 3.5 | 5.5 | 7.5 | 9;
 
+export interface AiRecommendation {
+  activities: string[];
+  phrases: string[];
+  createdAt: string;
+}
+
 export interface MockMoodEntry {
   id: string;
   entryDate: string;
@@ -8,6 +14,7 @@ export interface MockMoodEntry {
   feelings: string[];
   journalEntry: string;
   sleepHours: MockSleepRange;
+  aiRecommendation: AiRecommendation | null;
 }
 
 export const currentMoodQuote =

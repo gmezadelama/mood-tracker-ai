@@ -15,6 +15,7 @@ describe("MoodTrendChart", () => {
             feelings: ["Calm"],
             journalEntry: "A good day",
             sleepHours: 5.5,
+            aiRecommendation: null,
           },
         ]}
       />,

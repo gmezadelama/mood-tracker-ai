@@ -19,6 +19,10 @@ vi.mock("@/server/mood-entries", async (importOriginal) => {
   return { ...actual, createMoodEntry, listRecentMoodEntries };
 });
 
+const { attachAiMetadata } = vi.hoisted(() => ({ attachAiMetadata: vi.fn() }));
+
+vi.mock("@/server/ai/recommendations", () => ({ attachAiMetadata }));
+
 const { GET, POST } = await import("./route");
 
 const validBody = {
@@ -41,6 +45,10 @@ describe("GET /api/mood-entries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resolveCurrentUserId.mockResolvedValue(1);
+    attachAiMetadata.mockImplementation(async (_userId: number, entries: unknown[]) => ({
+      entries: entries.map((entry) => ({ ...(entry as object), aiRecommendation: null })),
+      aiQuotaRemaining: 5,
+    }));
   });
 
   it("returns 401 when identity cannot be resolved", async () => {
@@ -51,7 +59,7 @@ describe("GET /api/mood-entries", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns the current user's entries", async () => {
+  it("returns the current user's entries enriched with AI metadata", async () => {
     listRecentMoodEntries.mockResolvedValue([{ id: 1, entryDate: "2026-01-15" }]);
 
     const response = await GET(new NextRequest("http://localhost/api/mood-entries"));
@@ -59,7 +67,10 @@ describe("GET /api/mood-entries", () => {
 
     expect(response.status).toBe(200);
     expect(payload.entries).toHaveLength(1);
+    expect(payload.entries[0]).toMatchObject({ id: 1, aiRecommendation: null });
+    expect(payload.aiQuotaRemaining).toBe(5);
     expect(listRecentMoodEntries).toHaveBeenCalledWith(1, undefined);
+    expect(attachAiMetadata).toHaveBeenCalledWith(1, [{ id: 1, entryDate: "2026-01-15" }]);
   });
 
   it("rejects a limit outside the bounded window", async () => {

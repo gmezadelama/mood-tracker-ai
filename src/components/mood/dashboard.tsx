@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
+import { AiRecommendations } from "./ai-recommendations";
 import { MoodLogDialog } from "./mood-log-dialog";
 import { MoodTrendChart } from "./mood-trend-chart";
 import {
@@ -11,27 +12,38 @@ import {
   moodLabels,
   moodQuotes,
   sleepLabels,
+  type AiRecommendation,
   type MockAverage,
   type MockMoodEntry,
 } from "./mock-data";
 import { createMoodEntry, fetchMoodEntries, MoodApiError, type MoodEntryDraft } from "./mood-api";
 
+// How many of the most recent entries the backend accepts AI-recommendation
+// requests for (current entry + previous 3) — kept in sync with
+// AI_ELIGIBLE_WINDOW in src/server/ai/recommendations.ts for display only;
+// eligibility is still enforced server-side regardless of this constant.
+const AI_ELIGIBLE_WINDOW = 4;
+
 const cardClass = "rounded-2xl border border-blue-100 bg-white";
 
 export function Dashboard({ displayName }: { displayName: string }) {
   const [entries, setEntries] = useState<MockMoodEntry[]>([]);
+  const [aiQuotaRemaining, setAiQuotaRemaining] = useState(0);
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = useState("");
   const [today] = useState(() => localDateString(new Date()));
   const [isLogging, setIsLogging] = useState(false);
   const currentEntry = entries.find((entry) => entry.entryDate === today) ?? null;
   const averages = calculateMockAverages(entries);
+  const aiEligibleEntries = [...entries.slice(-AI_ELIGIBLE_WINDOW)].reverse();
 
   const loadEntries = useCallback(async (signal?: AbortSignal) => {
     setLoadStatus("loading");
     setLoadError("");
     try {
-      setEntries(await fetchMoodEntries(signal));
+      const history = await fetchMoodEntries(signal);
+      setEntries(history.entries);
+      setAiQuotaRemaining(history.aiQuotaRemaining);
       setLoadStatus("ready");
     } catch (error) {
       if (!signal?.aborted) {
@@ -48,8 +60,9 @@ export function Dashboard({ displayName }: { displayName: string }) {
   useEffect(() => {
     const controller = new AbortController();
     void fetchMoodEntries(controller.signal)
-      .then((loadedEntries) => {
-        setEntries(loadedEntries);
+      .then((history) => {
+        setEntries(history.entries);
+        setAiQuotaRemaining(history.aiQuotaRemaining);
         setLoadStatus("ready");
       })
       .catch((error: unknown) => {
@@ -72,7 +85,9 @@ export function Dashboard({ displayName }: { displayName: string }) {
     } catch (error) {
       if (error instanceof MoodApiError && error.status === 409) {
         try {
-          setEntries(await fetchMoodEntries());
+          const history = await fetchMoodEntries();
+          setEntries(history.entries);
+          setAiQuotaRemaining(history.aiQuotaRemaining);
         } catch {
           // Keep the original conflict message; a normal retry remains available.
         }
@@ -86,6 +101,12 @@ export function Dashboard({ displayName }: { displayName: string }) {
       .sort((left, right) => left.entryDate.localeCompare(right.entryDate))
       .slice(-11);
     setEntries(updatedEntries);
+  }
+
+  function handleRecommendationReady(entryId: string, recommendation: AiRecommendation) {
+    setEntries((current) =>
+      current.map((entry) => (entry.id === entryId ? { ...entry, aiRecommendation: recommendation } : entry)),
+    );
   }
 
   return (
@@ -143,7 +164,13 @@ export function Dashboard({ displayName }: { displayName: string }) {
             </div>
           )}
 
-          <section className={`${currentEntry ? "mt-8" : "mt-16"} grid min-w-0 gap-8 lg:grid-cols-[370px_minmax(0,1fr)]`}>
+          <AiRecommendations
+            entries={aiEligibleEntries}
+            aiQuotaRemaining={aiQuotaRemaining}
+            onRecommendationReady={handleRecommendationReady}
+          />
+
+          <section className="mt-8 grid min-w-0 gap-8 lg:grid-cols-[370px_minmax(0,1fr)]">
             <AveragesCard averages={averages} />
             <MoodTrendChart entries={entries} />
           </section>

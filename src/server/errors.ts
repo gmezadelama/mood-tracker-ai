@@ -21,3 +21,19 @@ export class ConflictError extends Error {
     this.name = "ConflictError";
   }
 }
+
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
+// A request that is well-formed and authenticated but violates a product
+// rule (e.g. the mood entry is outside the AI eligibility window).
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}

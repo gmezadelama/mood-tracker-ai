@@ -13,6 +13,7 @@ function entries(size: number): MockMoodEntry[] {
     feelings: ["Calm"],
     journalEntry: `Entry ${index + 1}`,
     sleepHours: sleepRanges[index % sleepRanges.length],
+    aiRecommendation: null,
   }));
 }
 
