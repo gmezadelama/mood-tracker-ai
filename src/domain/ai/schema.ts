@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { FEELINGS, MOOD_VALUES } from "@/domain/mood/constants";
+import { FEELINGS, MOOD_VALUES, type MoodValue } from "@/domain/mood/constants";
 
 // Recommended bounds from the product spec: small enough that the feature
 // stays a light-touch enhancement, never a wall of generated text.
@@ -26,8 +26,18 @@ export const moodRecommendationsSchema = z.strictObject({
 
 export type MoodRecommendations = z.infer<typeof moodRecommendationsSchema>;
 
+// Gemini's structured-output API rejects numeric literal unions because the
+// generated `anyOf` enum values are described as strings. The ordered mood
+// scale is contiguous, so an integer range expresses the same canonical set
+// while producing a provider-compatible JSON Schema.
+const moodScaleSchema = z
+  .number()
+  .int()
+  .min(MOOD_VALUES[0])
+  .max(MOOD_VALUES[MOOD_VALUES.length - 1]) as z.ZodType<MoodValue>;
+
 export const moodInferenceSchema = z.strictObject({
-  mood: z.union(MOOD_VALUES.map((mood) => z.literal(mood))),
+  mood: moodScaleSchema,
   feelings: z.array(z.enum(FEELINGS)).min(1).max(3).refine(
     (feelings) => new Set(feelings).size === feelings.length,
     "Feelings must be unique",

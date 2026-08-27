@@ -87,6 +87,7 @@ describe("moodInferenceSchema", () => {
 
   it.each([
     { mood: 3, feelings: ["Calm"] },
+    { mood: 1.5, feelings: ["Calm"] },
     { mood: 0, feelings: ["Invented"] },
     { mood: 0, feelings: [] },
     { mood: 0, feelings: ["Calm", "Tired", "Hopeful", "Content"] },
