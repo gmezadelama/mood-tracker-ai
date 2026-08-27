@@ -48,6 +48,7 @@ describe("GET /api/mood-entries", () => {
     attachAiMetadata.mockImplementation(async (_userId: number, entries: unknown[]) => ({
       entries: entries.map((entry) => ({ ...(entry as object), aiRecommendation: null })),
       aiQuotaRemaining: 5,
+      aiStatus: "available",
     }));
   });
 
@@ -69,6 +70,7 @@ describe("GET /api/mood-entries", () => {
     expect(payload.entries).toHaveLength(1);
     expect(payload.entries[0]).toMatchObject({ id: 1, aiRecommendation: null });
     expect(payload.aiQuotaRemaining).toBe(5);
+    expect(payload.aiStatus).toBe("available");
     expect(listRecentMoodEntries).toHaveBeenCalledWith(1, undefined);
     expect(attachAiMetadata).toHaveBeenCalledWith(1, [{ id: 1, entryDate: "2026-01-15" }]);
   });

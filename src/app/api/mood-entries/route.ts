@@ -31,12 +31,13 @@ export async function GET(request: NextRequest) {
     const entries = await listRecentMoodEntries(userId, parsedQuery.data.limit);
 
     // Additive-only enrichment (see src/server/ai/recommendations.ts):
-    // folds each entry's persisted AI recommendation (if any) and the
-    // user's remaining daily quota into this same response, so the
-    // dashboard's one existing list fetch is enough to render AI state
-    // too — no extra per-entry round trip.
-    const { entries: enrichedEntries, aiQuotaRemaining } = await attachAiMetadata(userId, entries);
-    return NextResponse.json({ entries: enrichedEntries, aiQuotaRemaining });
+    // folds each entry's persisted AI recommendation (if any), the user's
+    // remaining daily quota, and whether the AI feature is configured at
+    // all into this same response, so the dashboard's one existing list
+    // fetch is enough to render AI state too — no extra per-entry round
+    // trip.
+    const { entries: enrichedEntries, aiQuotaRemaining, aiStatus } = await attachAiMetadata(userId, entries);
+    return NextResponse.json({ entries: enrichedEntries, aiQuotaRemaining, aiStatus });
   } catch (error) {
     return toErrorResponse(error);
   }

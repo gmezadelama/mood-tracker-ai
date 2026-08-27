@@ -108,10 +108,15 @@ export async function attachAiMetadata(
 ): Promise<{
   entries: (MoodEntryResponse & { aiRecommendation: AiRecommendationResponse | null })[];
   aiQuotaRemaining: number;
+  aiStatus: "available" | "unavailable";
 }> {
   const ids = entries.map((entry) => entry.id);
   const recommendationsByEntryId = await findAiRecommendations(ids);
   const config = loadAiConfig();
+  // aiQuotaRemaining is 0 in both the "exhausted" and "misconfigured" cases,
+  // so aiStatus carries the distinction separately — the client must not
+  // infer "unavailable" from a zero quota alone (a missing/invalid config
+  // won't be fixed by waiting for tomorrow's reset).
   const aiQuotaRemaining = config ? await getRemainingDailyQuota(userId, config.dailyLimit) : 0;
 
   return {
@@ -122,6 +127,7 @@ export async function attachAiMetadata(
         : null,
     })),
     aiQuotaRemaining,
+    aiStatus: config ? "available" : "unavailable",
   };
 }
 

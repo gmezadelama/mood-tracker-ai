@@ -7,6 +7,11 @@ export interface AiRecommendation {
   createdAt: string;
 }
 
+// "unavailable" means the AI feature itself is unusable (missing/invalid
+// provider configuration) — distinct from a merely exhausted daily quota,
+// which is represented separately via aiQuotaRemaining === 0.
+export type AiFeatureStatus = "available" | "unavailable";
+
 export interface MockMoodEntry {
   id: string;
   entryDate: string;

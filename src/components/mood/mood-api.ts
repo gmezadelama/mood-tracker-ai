@@ -6,7 +6,7 @@ import {
   type SleepRange,
 } from "@/domain/mood/constants";
 
-import type { AiRecommendation, MockMoodEntry, MockSleepRange } from "./mock-data";
+import type { AiFeatureStatus, AiRecommendation, MockMoodEntry, MockSleepRange } from "./mock-data";
 
 interface MoodEntryResponse {
   id: number;
@@ -23,6 +23,7 @@ interface MoodEntryResponse {
 interface MoodEntriesResponse {
   entries: MoodEntryResponse[];
   aiQuotaRemaining: number;
+  aiStatus: AiFeatureStatus;
 }
 
 interface MoodEntryCreatedResponse {
@@ -50,6 +51,7 @@ export class MoodApiError extends Error {
 export interface MoodHistory {
   entries: MockMoodEntry[];
   aiQuotaRemaining: number;
+  aiStatus: AiFeatureStatus;
 }
 
 export async function fetchMoodEntries(signal?: AbortSignal): Promise<MoodHistory> {
@@ -65,6 +67,7 @@ export async function fetchMoodEntries(signal?: AbortSignal): Promise<MoodHistor
       .map(mapMoodEntry)
       .sort((left, right) => left.entryDate.localeCompare(right.entryDate)),
     aiQuotaRemaining: payload.aiQuotaRemaining,
+    aiStatus: payload.aiStatus,
   };
 }
 

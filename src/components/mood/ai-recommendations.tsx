@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { fallbackSuggestionsForMood, type MoodFallbackSuggestions } from "@/domain/mood/fallback-suggestions";
 
-import { moodLabels, type AiRecommendation, type MockMoodEntry } from "./mock-data";
+import { moodLabels, type AiFeatureStatus, type AiRecommendation, type MockMoodEntry } from "./mock-data";
 import { generateMoodRecommendations, MoodApiError } from "./mood-api";
 
 const UNAVAILABLE_MESSAGE = "AI suggestions aren't available right now. Please try again later.";
@@ -19,11 +19,15 @@ const QUOTA_MESSAGE = "AI suggestions are available again tomorrow.";
 export function AiRecommendations({
   entries,
   aiQuotaRemaining,
+  aiStatus,
   onRecommendationReady,
+  onQuotaConsumed,
 }: {
   entries: MockMoodEntry[];
   aiQuotaRemaining: number;
+  aiStatus: AiFeatureStatus;
   onRecommendationReady: (entryId: string, recommendation: AiRecommendation) => void;
+  onQuotaConsumed: () => void;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [messageByEntryId, setMessageByEntryId] = useState<Record<string, string>>({});
@@ -43,11 +47,17 @@ export function AiRecommendations({
       const result = await generateMoodRecommendations(entryId);
       if (result.status === "ready") {
         onRecommendationReady(entryId, result.recommendation);
+        onQuotaConsumed();
+      } else if (result.status === "quota_exhausted") {
+        // Never reserved a quota unit server-side — nothing to reconcile.
+        setMessageByEntryId((current) => ({ ...current, [entryId]: QUOTA_MESSAGE }));
       } else {
-        setMessageByEntryId((current) => ({
-          ...current,
-          [entryId]: result.status === "quota_exhausted" ? QUOTA_MESSAGE : UNAVAILABLE_MESSAGE,
-        }));
+        // The Generate control only renders when aiStatus is "available",
+        // so a per-request "unavailable" result here can only be the
+        // provider/validation-failure path — quota was reserved before
+        // Gemini was called, so it needs to be reconciled too.
+        onQuotaConsumed();
+        setMessageByEntryId((current) => ({ ...current, [entryId]: UNAVAILABLE_MESSAGE }));
       }
     } catch (error) {
       setMessageByEntryId((current) => ({
@@ -85,6 +95,11 @@ export function AiRecommendations({
 
                 {messageByEntryId[entry.id] ? (
                   <p className="mt-2 text-[13px] text-navy-muted">{messageByEntryId[entry.id]}</p>
+                ) : aiStatus === "unavailable" ? (
+                  // Missing/invalid provider configuration — distinct from
+                  // an exhausted quota; "available again tomorrow" would
+                  // be misleading here since a reset can't fix this.
+                  <p className="mt-2 text-[13px] text-navy-muted">{UNAVAILABLE_MESSAGE}</p>
                 ) : aiQuotaRemaining > 0 ? (
                   <button
                     type="button"

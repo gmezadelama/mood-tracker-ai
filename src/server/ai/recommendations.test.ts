@@ -297,12 +297,13 @@ describe("attachAiMetadata", () => {
   it("attaches null for entries without a persisted recommendation", async () => {
     getRemainingDailyQuota.mockResolvedValue(3);
 
-    const { entries, aiQuotaRemaining } = await attachAiMetadata(1, [
+    const { entries, aiQuotaRemaining, aiStatus } = await attachAiMetadata(1, [
       { id: 1, entryDate: "2026-01-15", mood: 1, feelings: [], journalEntry: "", sleepRange: "SEVEN_TO_EIGHT", createdAt: "", updatedAt: "" },
     ]);
 
     expect(entries[0].aiRecommendation).toBeNull();
     expect(aiQuotaRemaining).toBe(3);
+    expect(aiStatus).toBe("available");
   });
 
   it("attaches an existing recommendation regardless of remaining quota", async () => {
@@ -321,12 +322,13 @@ describe("attachAiMetadata", () => {
     expect(aiQuotaRemaining).toBe(0);
   });
 
-  it("reports zero remaining quota when AI configuration is missing", async () => {
+  it("reports zero remaining quota and an unavailable status when AI configuration is missing", async () => {
     loadAiConfig.mockReturnValue(null);
 
-    const { aiQuotaRemaining } = await attachAiMetadata(1, []);
+    const { aiQuotaRemaining, aiStatus } = await attachAiMetadata(1, []);
 
     expect(aiQuotaRemaining).toBe(0);
+    expect(aiStatus).toBe("unavailable");
     expect(getRemainingDailyQuota).not.toHaveBeenCalled();
   });
 });

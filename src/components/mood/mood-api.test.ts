@@ -31,13 +31,27 @@ describe("mood API mapping", () => {
         apiEntry(1, "2026-01-15", "ZERO_TO_TWO"),
       ],
       aiQuotaRemaining: 4,
+      aiStatus: "available",
     })));
 
-    const { entries, aiQuotaRemaining } = await fetchMoodEntries();
+    const { entries, aiQuotaRemaining, aiStatus } = await fetchMoodEntries();
 
     expect(entries.map((entry) => entry.entryDate)).toEqual(["2026-01-15", "2026-01-16"]);
     expect(entries.map((entry) => entry.sleepHours)).toEqual([1, 9]);
     expect(aiQuotaRemaining).toBe(4);
+    expect(aiStatus).toBe("available");
+  });
+
+  it("passes through an unavailable AI status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
+      entries: [],
+      aiQuotaRemaining: 0,
+      aiStatus: "unavailable",
+    })));
+
+    const { aiStatus } = await fetchMoodEntries();
+
+    expect(aiStatus).toBe("unavailable");
   });
 
   it("defaults a missing aiRecommendation to null and passes through an existing one", async () => {

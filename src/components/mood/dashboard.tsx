@@ -12,6 +12,7 @@ import {
   moodLabels,
   moodQuotes,
   sleepLabels,
+  type AiFeatureStatus,
   type AiRecommendation,
   type MockAverage,
   type MockMoodEntry,
@@ -29,6 +30,7 @@ const cardClass = "rounded-2xl border border-blue-100 bg-white";
 export function Dashboard({ displayName }: { displayName: string }) {
   const [entries, setEntries] = useState<MockMoodEntry[]>([]);
   const [aiQuotaRemaining, setAiQuotaRemaining] = useState(0);
+  const [aiStatus, setAiStatus] = useState<AiFeatureStatus>("available");
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = useState("");
   const [today] = useState(() => localDateString(new Date()));
@@ -44,6 +46,7 @@ export function Dashboard({ displayName }: { displayName: string }) {
       const history = await fetchMoodEntries(signal);
       setEntries(history.entries);
       setAiQuotaRemaining(history.aiQuotaRemaining);
+      setAiStatus(history.aiStatus);
       setLoadStatus("ready");
     } catch (error) {
       if (!signal?.aborted) {
@@ -63,6 +66,7 @@ export function Dashboard({ displayName }: { displayName: string }) {
       .then((history) => {
         setEntries(history.entries);
         setAiQuotaRemaining(history.aiQuotaRemaining);
+        setAiStatus(history.aiStatus);
         setLoadStatus("ready");
       })
       .catch((error: unknown) => {
@@ -88,6 +92,7 @@ export function Dashboard({ displayName }: { displayName: string }) {
           const history = await fetchMoodEntries();
           setEntries(history.entries);
           setAiQuotaRemaining(history.aiQuotaRemaining);
+          setAiStatus(history.aiStatus);
         } catch {
           // Keep the original conflict message; a normal retry remains available.
         }
@@ -107,6 +112,16 @@ export function Dashboard({ displayName }: { displayName: string }) {
     setEntries((current) =>
       current.map((entry) => (entry.id === entryId ? { ...entry, aiRecommendation: recommendation } : entry)),
     );
+  }
+
+  // Called for any generation attempt that actually reserved a quota unit
+  // server-side ("ready" or "unavailable" — never "quota_exhausted", which
+  // never reserves one). Keeps the client's remaining count in sync
+  // immediately, instead of waiting for the next full reload, so other
+  // eligible entries' Generate controls disable themselves without an
+  // unnecessary round trip.
+  function handleQuotaConsumed() {
+    setAiQuotaRemaining((current) => Math.max(0, current - 1));
   }
 
   return (
@@ -167,7 +182,9 @@ export function Dashboard({ displayName }: { displayName: string }) {
           <AiRecommendations
             entries={aiEligibleEntries}
             aiQuotaRemaining={aiQuotaRemaining}
+            aiStatus={aiStatus}
             onRecommendationReady={handleRecommendationReady}
+            onQuotaConsumed={handleQuotaConsumed}
           />
 
           <section className="mt-8 grid min-w-0 gap-8 lg:grid-cols-[370px_minmax(0,1fr)]">
