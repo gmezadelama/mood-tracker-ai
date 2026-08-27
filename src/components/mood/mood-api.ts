@@ -119,13 +119,33 @@ export async function generateMoodRecommendations(
   return (await response.json()) as GenerateRecommendationsResult;
 }
 
+export type MoodInferenceResult =
+  | {
+      status: "ready";
+      inference: { mood: MoodValue; feelings: Feeling[] };
+      aiQuotaRemaining: number;
+    }
+  | { status: "quota_exhausted"; aiQuotaRemaining: 0 }
+  | { status: "unavailable"; aiQuotaRemaining: number };
+
+export async function inferMood(reflection: string): Promise<MoodInferenceResult> {
+  const response = await fetch("/api/mood-inference", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reflection }),
+  });
+  if (!response.ok) throw apiError(response.status, "infer");
+
+  return (await response.json()) as MoodInferenceResult;
+}
+
 function sleepRangeForChartValue(value: MockSleepRange): SleepRange {
   const range = SLEEP_RANGES.find((candidate) => SLEEP_CHART_VALUES[candidate] === value);
   if (!range) throw new Error("Unsupported sleep range");
   return range;
 }
 
-function apiError(status: number, operation: "load" | "submit" | "recommend") {
+function apiError(status: number, operation: "load" | "submit" | "recommend" | "infer") {
   if (status === 400) {
     return new MoodApiError(status, "Please review your check-in and try again.");
   }
@@ -135,7 +155,7 @@ function apiError(status: number, operation: "load" | "submit" | "recommend") {
   if (status === 409) {
     return new MoodApiError(status, "You already logged a mood for today.");
   }
-  if (operation === "recommend") {
+  if (operation === "recommend" || operation === "infer") {
     return new MoodApiError(status, "AI suggestions aren't available right now. Please try again later.");
   }
   return new MoodApiError(

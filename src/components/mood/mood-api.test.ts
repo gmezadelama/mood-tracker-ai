@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createMoodEntry, fetchMoodEntries, generateMoodRecommendations } from "./mood-api";
+import { createMoodEntry, fetchMoodEntries, generateMoodRecommendations, inferMood } from "./mood-api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -124,5 +124,26 @@ describe("generateMoodRecommendations", () => {
       status: 403,
       message: "AI suggestions aren't available right now. Please try again later.",
     });
+  });
+});
+
+describe("inferMood", () => {
+  it("posts only the reflection to the product-specific endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({
+      status: "ready",
+      inference: { mood: 0, feelings: ["Calm"] },
+      aiQuotaRemaining: 7,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(inferMood("I feel calm and steady.")).resolves.toMatchObject({ status: "ready" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/mood-inference", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reflection: "I feel calm and steady." }),
+    });
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(payload).not.toHaveProperty("userId");
+    expect(payload).not.toHaveProperty("history");
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AI_TEXT_MAX_LENGTH, moodRecommendationsSchema } from "./schema";
+import { AI_TEXT_MAX_LENGTH, moodInferenceSchema, moodRecommendationsSchema } from "./schema";
 
 const valid = {
   activities: ["Take a short walk outside", "Listen to a favorite song"],
@@ -74,5 +74,25 @@ describe("moodRecommendationsSchema", () => {
   it("rejects a non-array phrases field", () => {
     const result = moodRecommendationsSchema.safeParse({ ...valid, phrases: "Be gentle with yourself." });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("moodInferenceSchema", () => {
+  it("accepts one canonical mood and one to three canonical unique feelings", () => {
+    expect(moodInferenceSchema.parse({ mood: -1, feelings: ["Down", "Tired"] })).toEqual({
+      mood: -1,
+      feelings: ["Down", "Tired"],
+    });
+  });
+
+  it.each([
+    { mood: 3, feelings: ["Calm"] },
+    { mood: 0, feelings: ["Invented"] },
+    { mood: 0, feelings: [] },
+    { mood: 0, feelings: ["Calm", "Tired", "Hopeful", "Content"] },
+    { mood: 0, feelings: ["Calm", "Calm"] },
+    { mood: 0, feelings: ["Calm"], confidence: 0.9 },
+  ])("rejects invalid inference output %#", (payload) => {
+    expect(moodInferenceSchema.safeParse(payload).success).toBe(false);
   });
 });

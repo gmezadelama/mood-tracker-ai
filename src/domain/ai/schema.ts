@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { FEELINGS, MOOD_VALUES } from "@/domain/mood/constants";
+
 // Recommended bounds from the product spec: small enough that the feature
 // stays a light-touch enhancement, never a wall of generated text.
 export const AI_ACTIVITIES_MIN = 2;
@@ -23,3 +25,13 @@ export const moodRecommendationsSchema = z.strictObject({
 });
 
 export type MoodRecommendations = z.infer<typeof moodRecommendationsSchema>;
+
+export const moodInferenceSchema = z.strictObject({
+  mood: z.union(MOOD_VALUES.map((mood) => z.literal(mood))),
+  feelings: z.array(z.enum(FEELINGS)).min(1).max(3).refine(
+    (feelings) => new Set(feelings).size === feelings.length,
+    "Feelings must be unique",
+  ),
+});
+
+export type MoodInference = z.infer<typeof moodInferenceSchema>;

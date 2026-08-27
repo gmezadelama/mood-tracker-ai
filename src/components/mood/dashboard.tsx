@@ -197,6 +197,9 @@ export function Dashboard({ displayName }: { displayName: string }) {
       {isLogging && (
         <MoodLogDialog
           entryDate={today}
+          aiQuotaRemaining={aiQuotaRemaining}
+          aiStatus={aiStatus}
+          onAiQuotaRemainingChange={setAiQuotaRemaining}
           onClose={() => setIsLogging(false)}
           onSubmit={logEntry}
         />

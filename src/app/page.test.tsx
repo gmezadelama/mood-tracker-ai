@@ -50,7 +50,7 @@ function apiEntry(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderEmptyDashboard() {
-  fetchMock.mockResolvedValueOnce(jsonResponse({ entries: [] }));
+  fetchMock.mockResolvedValueOnce(jsonResponse({ entries: [], aiQuotaRemaining: 8, aiStatus: "available" }));
   render(<Home />);
   return screen.findByRole("button", { name: "Log today's mood" });
 }
@@ -199,5 +199,108 @@ describe("Home integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
 
     expect(screen.getByRole("radio", { name: "Happy" })).not.toBeChecked();
+  });
+
+  it("keeps the manual path unchanged and never calls mood inference", async () => {
+    await renderEmptyDashboard();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ entry: apiEntry() }, 201));
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    const dialog = screen.getByRole("dialog", { name: "Log your mood." });
+    completeDraft(dialog);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(fetchMock.mock.calls.some(([url]) => url === "/api/mood-inference")).toBe(false);
+  });
+
+  it("validates assisted reflection before calling AI and preserves it when returning from review", async () => {
+    await renderEmptyDashboard();
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      status: "ready",
+      inference: { mood: 1, feelings: ["Hopeful", "Calm"] },
+      aiQuotaRemaining: 7,
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    const reflection = screen.getByLabelText("Write about your day...");
+    fireEvent.change(reflection, { target: { value: " too short " } });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Add a little more");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(reflection, { target: { value: "I feel hopeful but still a little tired." } });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+
+    expect(await screen.findByRole("heading", { name: "Here's what your check-in suggests" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Happy" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Hopeful" })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByLabelText("Write about your day...")).toHaveValue("I feel hopeful but still a little tired.");
+  });
+
+  it("applies editable suggestions and saves the confirmed values through the existing mood API", async () => {
+    await renderEmptyDashboard();
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        status: "ready",
+        inference: { mood: 1, feelings: ["Hopeful", "Calm"] },
+        aiQuotaRemaining: 7,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ entry: apiEntry({ mood: 0, feelings: ["Calm", "Content"], journalEntry: "I feel hopeful but steady." }) }, 201));
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    fireEvent.change(screen.getByLabelText("Write about your day..."), { target: { value: "I feel hopeful but steady." } });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+    await screen.findByRole("heading", { name: "Here's what your check-in suggests" });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Neutral" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Hopeful" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Content" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("radio", { name: "5-6 hours" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const payload = JSON.parse(String(fetchMock.mock.calls[2][1]?.body));
+    expect(payload).toMatchObject({ mood: 0, feelings: ["Calm", "Content"], journalEntry: "I feel hopeful but steady." });
+  });
+
+  it("disables duplicate inference requests and offers manual fallback after provider failure", async () => {
+    await renderEmptyDashboard();
+    let resolveInference!: (response: Response) => void;
+    fetchMock.mockReturnValueOnce(new Promise((resolve) => { resolveInference = resolve; }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    fireEvent.change(screen.getByLabelText("Write about your day..."), { target: { value: "I am uncertain and low energy." } });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+
+    const pending = screen.getByRole("button", { name: "Finding a mood that fits..." });
+    expect(pending).toBeDisabled();
+    expect(pending).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(pending);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    resolveInference(jsonResponse({ status: "unavailable", aiQuotaRemaining: 7 }));
+    expect(await screen.findByRole("status")).toHaveTextContent("isn't available right now");
+    fireEvent.click(screen.getByRole("button", { name: "Choose mood manually" }));
+    expect(screen.getByRole("radio", { name: "Very Happy" })).toBeInTheDocument();
+  });
+
+  it.each([
+    [0, "available", "AI mood assistance will be back tomorrow."],
+    [8, "unavailable", "AI mood assistance isn't available right now."],
+  ])("keeps manual logging available for quota/status state %#", async (quota, aiStatus, message) => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ entries: [], aiQuotaRemaining: quota, aiStatus }));
+    render(<Home />);
+    await screen.findByRole("button", { name: "Log today's mood" });
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+
+    expect(screen.getByText((content) => content.includes(message))).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Help me identify my mood" })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Happy" })).toBeInTheDocument();
   });
 });
