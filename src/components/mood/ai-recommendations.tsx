@@ -6,6 +6,7 @@ import { fallbackSuggestionsForMood, type MoodFallbackSuggestions } from "@/doma
 
 import { moodLabels, type AiFeatureStatus, type AiRecommendation, type MockMoodEntry } from "./mock-data";
 import { generateMoodRecommendations, MoodApiError } from "./mood-api";
+import { AiQuotaNotice } from "./ai-quota-notice";
 
 const UNAVAILABLE_MESSAGE = "AI suggestions aren't available right now. Please try again later.";
 const QUOTA_MESSAGE = "AI suggestions are available again tomorrow.";
@@ -75,6 +76,7 @@ export function AiRecommendations({
       <p className="mt-1 text-[14px] text-navy-muted">
         Optional, gentle suggestions for your current and last 3 check-ins — not medical advice.
       </p>
+      {aiStatus === "available" && <AiQuotaNotice remaining={aiQuotaRemaining} className="mt-3" />}
 
       <ul className="mt-5 grid gap-3">
         {entries.map((entry) => (

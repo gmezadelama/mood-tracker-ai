@@ -268,6 +268,154 @@ describe("Home integration", () => {
     expect(payload).toMatchObject({ mood: 0, feelings: ["Calm", "Content"], journalEntry: "I feel hopeful but steady." });
   });
 
+  it("allows exactly one explicit retry, replaces the suggestion, and keeps the limit across back navigation", async () => {
+    await renderEmptyDashboard();
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        status: "ready",
+        inference: { mood: 2, feelings: ["Hopeful", "Confident"] },
+        aiQuotaRemaining: 2,
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        status: "ready",
+        inference: { mood: 0, feelings: ["Calm", "Content"] },
+        aiQuotaRemaining: 1,
+      }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    fireEvent.change(screen.getByLabelText("Write about your day..."), {
+      target: { value: "I feel hopeful but would like another perspective." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+
+    const retry = await screen.findByRole("button", { name: "Try another suggestion" });
+    expect(screen.getByRole("radio", { name: "Very Happy" })).toBeChecked();
+    expect(screen.getByText("2 AI requests left today.")).toBeInTheDocument();
+    fireEvent.click(retry);
+
+    const retryPending = screen.getByRole("button", { name: "Finding another suggestion..." });
+    expect(retryPending).toBeDisabled();
+    expect(retryPending).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(retryPending);
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/mood-inference")).toHaveLength(2);
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Neutral" })).toBeChecked());
+    expect(screen.getByRole("checkbox", { name: "Content" })).toBeChecked();
+    expect(screen.getByText("1 AI request left today.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try another suggestion" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/mood-inference")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("button", { name: "Return to suggestion" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Return to suggestion" }));
+    expect(screen.queryByRole("button", { name: "Try another suggestion" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/mood-inference")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Happy" }));
+    expect(screen.getByRole("radio", { name: "Happy" })).toBeChecked();
+  });
+
+  it("preserves the first valid suggestion when the one retry fails", async () => {
+    await renderEmptyDashboard();
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        status: "ready",
+        inference: { mood: 1, feelings: ["Hopeful", "Calm"] },
+        aiQuotaRemaining: 2,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ status: "unavailable", aiQuotaRemaining: 1 }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    fireEvent.change(screen.getByLabelText("Write about your day..."), {
+      target: { value: "I feel cautiously hopeful and mostly calm today." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Try another suggestion" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("You can still edit this suggestion and continue.");
+    expect(screen.getByRole("radio", { name: "Happy" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Hopeful" })).toBeChecked();
+    expect(screen.queryByRole("button", { name: "Try another suggestion" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+  });
+
+  it("does not offer retry when the initial inference consumes the final shared request", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ entries: [], aiQuotaRemaining: 1, aiStatus: "available" }))
+      .mockResolvedValueOnce(jsonResponse({
+        status: "ready",
+        inference: { mood: 1, feelings: ["Hopeful"] },
+        aiQuotaRemaining: 0,
+      }));
+    render(<Home />);
+    await screen.findByRole("button", { name: "Log today's mood" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    expect(screen.getByText("1 AI request left today.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    fireEvent.change(screen.getByLabelText("Write about your day..."), {
+      target: { value: "I feel hopeful and calm after finishing my work." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+
+    expect(await screen.findByRole("heading", { name: "Here's what your check-in suggests" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try another suggestion" })).not.toBeInTheDocument();
+    expect(screen.getByText("AI mood assistance will be back tomorrow.")).toBeInTheDocument();
+  });
+
+  it("propagates Feature 2 quota changes immediately to the Feature 1 panel", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        entries: [apiEntry({ entryDate: "2026-01-14" })],
+        aiQuotaRemaining: 3,
+        aiStatus: "available",
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        status: "ready",
+        inference: { mood: 1, feelings: ["Hopeful"] },
+        aiQuotaRemaining: 2,
+      }));
+    render(<Home />);
+    await screen.findByRole("button", { name: "Log today's mood" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    fireEvent.change(screen.getByLabelText("Write about your day..."), {
+      target: { value: "I feel hopeful and ready for a calmer afternoon." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+
+    await screen.findByRole("heading", { name: "Here's what your check-in suggests" });
+    expect(screen.getAllByText("2 AI requests left today.")).toHaveLength(2);
+  });
+
+  it("propagates Feature 1 quota changes immediately into an open Feature 2 dialog", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        entries: [apiEntry({ entryDate: "2026-01-14" })],
+        aiQuotaRemaining: 3,
+        aiStatus: "available",
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        status: "ready",
+        recommendation: {
+          activities: ["Take a short walk"],
+          phrases: ["Notice what helped today."],
+          createdAt: "2026-01-15T00:00:00.000Z",
+        },
+      }));
+    render(<Home />);
+    await screen.findByRole("button", { name: "Log today's mood" });
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate personalized suggestions" }));
+
+    await screen.findByText("Personalized by AI");
+    expect(screen.getAllByText("2 AI requests left today.")).toHaveLength(2);
+  });
+
   it("disables duplicate inference requests and offers manual fallback after provider failure", async () => {
     await renderEmptyDashboard();
     let resolveInference!: (response: Response) => void;

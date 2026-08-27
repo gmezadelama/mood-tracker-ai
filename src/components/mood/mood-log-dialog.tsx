@@ -14,6 +14,7 @@ import {
   type MockSleepRange,
 } from "./mock-data";
 import { inferMood, type MoodEntryDraft } from "./mood-api";
+import { AiQuotaNotice } from "./ai-quota-notice";
 
 const JOURNAL_LIMIT = 150;
 const AI_REFLECTION_MIN = 10;
@@ -55,6 +56,10 @@ export function MoodLogDialog({
   const [error, setError] = useState("");
   const [aiMessage, setAiMessage] = useState("");
   const [isInferring, setIsInferring] = useState(false);
+  const [hasRequestedInference, setHasRequestedInference] = useState(false);
+  const [hasValidSuggestion, setHasValidSuggestion] = useState(false);
+  const [hasUsedRetry, setHasUsedRetry] = useState(false);
+  const [suggestionVersion, setSuggestionVersion] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isBusy = isInferring || isSubmitting;
   const steps: Step[] = isAssisted
@@ -74,7 +79,7 @@ export function MoodLogDialog({
 
   useEffect(() => {
     if (step !== "mood") stepHeadingRef.current?.focus();
-  }, [step]);
+  }, [step, suggestionVersion]);
 
   function close() {
     if (isBusy) return;
@@ -118,6 +123,7 @@ export function MoodLogDialog({
   }
 
   async function requestInference() {
+    if (hasRequestedInference) return;
     const reflection = draft.journalEntry.trim();
     if (reflection.length < AI_REFLECTION_MIN) {
       setError("Add a little more about how you're feeling so AI can suggest a mood.");
@@ -126,12 +132,14 @@ export function MoodLogDialog({
 
     setError("");
     setAiMessage("");
+    setHasRequestedInference(true);
     setIsInferring(true);
     try {
       const result = await inferMood(reflection);
       onAiQuotaRemainingChange(result.aiQuotaRemaining);
       if (result.status === "ready") {
         setDraft((current) => ({ ...current, mood: result.inference.mood, feelings: result.inference.feelings }));
+        setHasValidSuggestion(true);
         setStep("review");
       } else if (result.status === "quota_exhausted") {
         setAiMessage("AI mood assistance will be back tomorrow. You've reached today's limit, but you can still choose your mood and feelings yourself.");
@@ -140,6 +148,31 @@ export function MoodLogDialog({
       }
     } catch {
       setAiMessage("AI mood assistance isn't available right now. You can still choose your mood and feelings yourself.");
+    } finally {
+      setIsInferring(false);
+    }
+  }
+
+  async function retryInference() {
+    if (!hasValidSuggestion || hasUsedRetry || aiQuotaRemaining < 1 || isInferring) return;
+
+    setHasUsedRetry(true);
+    setError("");
+    setAiMessage("");
+    setIsInferring(true);
+    try {
+      const result = await inferMood(draft.journalEntry.trim());
+      onAiQuotaRemainingChange(result.aiQuotaRemaining);
+      if (result.status === "ready") {
+        setDraft((current) => ({ ...current, mood: result.inference.mood, feelings: result.inference.feelings }));
+        setSuggestionVersion((current) => current + 1);
+      } else if (result.status === "quota_exhausted") {
+        setAiMessage("AI mood assistance will be back tomorrow. You've reached today's limit, but you can still choose your mood and feelings yourself.");
+      } else {
+        setAiMessage("AI mood assistance isn't available right now. You can still edit this suggestion and continue.");
+      }
+    } catch {
+      setAiMessage("AI mood assistance isn't available right now. You can still edit this suggestion and continue.");
     } finally {
       setIsInferring(false);
     }
@@ -157,6 +190,12 @@ export function MoodLogDialog({
     setAiMessage("");
     if (step === "review") setStep("reflection");
     else if (step === "sleep" && isAssisted) setStep("review");
+  }
+
+  function returnToReview() {
+    setError("");
+    setAiMessage("");
+    setStep("review");
   }
 
   async function submit() {
@@ -244,11 +283,14 @@ export function MoodLogDialog({
                     <p>You&apos;ve reached today&apos;s limit, but you can still choose your mood and feelings yourself.</p>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    className="mt-4 min-h-11 rounded-xl border border-brand px-4 py-2 text-[15px] font-semibold text-brand outline-none hover:bg-brand/5 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-                    onClick={startAssistance}
-                  >Help me identify my mood</button>
+                  <>
+                    <AiQuotaNotice remaining={aiQuotaRemaining} className="mt-3" />
+                    <button
+                      type="button"
+                      className="mt-4 min-h-11 rounded-xl border border-brand px-4 py-2 text-[15px] font-semibold text-brand outline-none hover:bg-brand/5 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                      onClick={startAssistance}
+                    >Help me identify my mood</button>
+                  </>
                 )}
               </section>
             </>
@@ -278,7 +320,8 @@ export function MoodLogDialog({
               />
               <p id={`${titleId}-count`} className="mt-2 text-right text-[12px] text-navy-muted">{draft.journalEntry.length}/{JOURNAL_LIMIT}</p>
               {aiMessage && <p role="status" className="mt-3 text-[14px] leading-5 text-navy-muted">{aiMessage}</p>}
-              {isAssisted && (
+              {isAssisted && aiStatus === "available" && <AiQuotaNotice remaining={aiQuotaRemaining} className="mt-3" />}
+              {isAssisted && !hasValidSuggestion && (
                 <button
                   type="button"
                   disabled={isInferring}
@@ -303,6 +346,30 @@ export function MoodLogDialog({
               </div>
               <div className="mt-8">
                 <FeelingSelector feelings={draft.feelings} onToggle={toggleFeeling} heading="Suggested feelings" errorId={error ? `${titleId}-error` : undefined} />
+              </div>
+              <div className="mt-6 border-t border-blue-100 pt-5">
+                <p className="text-[14px] leading-5 text-navy-muted">
+                  {hasUsedRetry
+                    ? "You can still change anything above before continuing."
+                    : "Not quite right? You can change anything above or try one more suggestion."}
+                </p>
+                {aiMessage && <p role="status" className="mt-3 text-[14px] leading-5 text-navy-muted">{aiMessage}</p>}
+                {aiStatus === "available" && <AiQuotaNotice remaining={aiQuotaRemaining} className="mt-3" />}
+                {aiStatus === "available" && aiQuotaRemaining === 0 && (
+                  <div className="mt-3 text-[13px] leading-5 text-navy-muted">
+                    <p className="font-semibold text-navy">AI mood assistance will be back tomorrow.</p>
+                    <p>You&apos;ve reached today&apos;s limit, but you can still choose your mood and feelings yourself.</p>
+                  </div>
+                )}
+                {(isInferring || !hasUsedRetry) && aiQuotaRemaining > 0 && aiStatus === "available" && (
+                  <button
+                    type="button"
+                    aria-busy={isInferring}
+                    disabled={isInferring}
+                    className="mt-3 min-h-11 text-[14px] font-semibold text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:no-underline"
+                    onClick={() => void retryInference()}
+                  >{isInferring ? "Finding another suggestion..." : "Try another suggestion"}</button>
+                )}
               </div>
             </div>
           )}
@@ -334,14 +401,20 @@ export function MoodLogDialog({
           <button
             type="button"
             aria-busy={isBusy}
-            disabled={isBusy}
+            disabled={isBusy || (step === "reflection" && isAssisted && hasRequestedInference && !hasValidSuggestion)}
             className="h-[60px] w-full rounded-xl bg-brand text-[20px] font-semibold text-white outline-none hover:bg-[#3451c7] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-60"
-            onClick={step === "sleep" ? submit : step === "review" ? confirmReview : step === "reflection" && isAssisted ? requestInference : advanceManual}
+            onClick={step === "sleep" ? submit : step === "review" ? confirmReview : step === "reflection" && isAssisted ? hasValidSuggestion ? returnToReview : requestInference : advanceManual}
           >
             {step === "sleep"
               ? isSubmitting ? "Saving..." : "Submit"
               : step === "reflection" && isAssisted
-                ? isInferring ? "Finding a mood that fits..." : "Find a mood that fits"
+                ? hasValidSuggestion
+                  ? "Return to suggestion"
+                  : isInferring
+                    ? "Finding a mood that fits..."
+                    : hasRequestedInference
+                      ? "AI assistance unavailable"
+                      : "Find a mood that fits"
                 : "Continue"}
           </button>
         </div>

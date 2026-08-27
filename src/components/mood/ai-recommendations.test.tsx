@@ -89,6 +89,22 @@ describe("AiRecommendations", () => {
     expect(screen.getByRole("button", { name: "Generate personalized suggestions" })).toBeInTheDocument();
   });
 
+  it.each([
+    [2, "2 AI requests left today."],
+    [1, "1 AI request left today."],
+  ])("shows the low-quota notice with correct grammar at %s remaining", (remaining, message) => {
+    renderPanel({ aiQuotaRemaining: remaining });
+
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(screen.getByText("AI assistance resets tomorrow.")).toBeInTheDocument();
+  });
+
+  it("keeps quota invisible when at least three requests remain", () => {
+    renderPanel({ aiQuotaRemaining: 3 });
+
+    expect(screen.queryByText(/AI requests? left today/)).not.toBeInTheDocument();
+  });
+
   it("shows a persisted AI recommendation instead of fallback content, labeled as AI-personalized", () => {
     renderPanel({
       entries: [entry({
