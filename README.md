@@ -1,31 +1,49 @@
 # Mood Tracker AI
 
-A responsive mood tracking application based on the Frontend Mentor Mood Tracking App challenge.
+A responsive, authenticated mood tracking application based on the Frontend Mentor Mood Tracking App challenge, enhanced with carefully scoped AI functionality.
 
-The project is being built incrementally, starting with a production-quality implementation of the original challenge and later adding carefully scoped AI personalization and lightweight gamification.
+The project is built incrementally: first as a production-quality implementation of the original challenge, then with optional AI features that enhance the existing mood-tracking experience without turning AI into the product itself.
 
 ## Current status
 
-**v0 — Phase 3 complete**
+**v1.0 — In progress**
 
-Implemented so far:
+The original **v0 Frontend Mentor implementation is complete**.
 
-- PostgreSQL persistence model with Neon and Drizzle ORM
-- Application user and mood-entry data model
-- Mood-entry backend API
-- Validation with Zod
-- Recent mood history endpoint
-- One-entry-per-user-per-day persistence rules
-- Responsive Frontend Mentor dashboard UI
-- Current mood presentation
-- Average mood and sleep cards
-- Mood/sleep trends visualization with Recharts
-- Mock data for frontend development
-- Backend and frontend QA passes
+**v1.0 Feature 1 — AI recommendations is complete and undergoing final integration.**
 
-The frontend is currently intentionally using mock data.
+**v1.0 Feature 2 — AI-assisted mood inference is in progress.**
 
-Authentication, the mood logging interaction, and client/backend integration are separate upcoming phases.
+### Implemented
+
+- Responsive Frontend Mentor dashboard and mood logging flow
+- Clerk authentication with application-owned sign-in and sign-up pages
+- Clerk-to-application-user synchronization
+- PostgreSQL persistence with Neon and Drizzle ORM
+- Authenticated, user-scoped mood-entry API
+- One mood entry per user per calendar day
+- Mood, feelings, journal reflection, and sleep tracking
+- Recent mood history
+- Average mood and sleep statistics
+- Mood and sleep trend visualization with Recharts
+- Responsive mobile and desktop logging experience
+- Loading, empty, error, and persistence states
+- Accessible dialog and dashboard interactions
+- AI-generated activity and supportive phrase recommendations
+- Static mood-based suggestions when personalized AI recommendations have not been generated
+- Persisted AI recommendations with one generation per mood entry
+- AI recommendations for the current and three preceding mood entries
+- Per-user daily AI quota with UTC reset
+- Server-side Gemini integration with validated structured output
+- Graceful AI quota and provider-unavailable states
+- Automated backend, frontend, integration, quota, and AI tests
+
+### In progress
+
+- AI-assisted mood and feelings inference during mood logging
+- Final v1.0 QA
+- Production deployment
+- Portfolio media and documentation
 
 ## Technology stack
 
@@ -38,49 +56,112 @@ Authentication, the mood logging interaction, and client/backend integration are
 - Neon PostgreSQL
 - Drizzle ORM
 - Zod
+- Vercel AI SDK
+- Google Gemini
 - Vitest
 - React Testing Library
 - Playwright
-- Vercel AI SDK
-- Google Gemini
 
 ## Development roadmap
 
 ### v0 — Frontend Mentor baseline
 
-Original mood tracking application without AI or additional gamification.
+**Complete.**
 
-Completed:
+Production-quality implementation of the original mood tracking challenge without AI or additional gamification.
 
-- Persistence model
-- Backend/API
-- Responsive dashboard UI with mock data
+Includes:
 
-Next:
-
+- Responsive dashboard
 - Mood logging flow
 - Authentication
+- PostgreSQL persistence
+- User-scoped backend API
+- Mood history
+- Mood and sleep statistics
+- Trend visualization
+- Accessible interaction states
 - Client/backend integration
-- Final accessibility, responsive, and production QA
 
-### v1 — AI-enhanced mood tracker
+### v1.0 — AI-enhanced mood tracker
 
-Planned AI functionality:
+**In progress.**
 
-- Journal entry → suggested mood, feelings, keywords, and explanation
-- Personalized response based on the current mood entry
-- Original Frontend Mentor responses remain available as the fallback when AI generation is unavailable or quota is exhausted
+AI is used only where it enhances an existing mood-tracking interaction. All AI requests execute server-side, use validated structured output, and are protected by per-user usage limits.
 
-AI suggestions remain advisory and never silently modify user data.
+#### Feature 1 — Personalized suggestions
 
-### v1.1 — Gamification
+**Complete.**
 
-Planned lightweight enhancements:
+Users can request personalized suggestions for a recently logged mood entry.
+
+The AI uses only the individual entry's:
+
+- mood
+- feelings
+- sleep
+- journal reflection
+
+It returns a small set of:
+
+- optional activity suggestions
+- short supportive phrases
+
+Generated recommendations are persisted and can be generated only once per mood entry.
+
+The current entry and three immediately preceding entries are eligible for AI generation.
+
+Before AI recommendations are generated, the application provides deterministic mood-based suggestions so the core experience does not depend on AI availability.
+
+AI generation is protected by a server-side per-user daily quota that resets at 00:00 UTC. Quota exhaustion or provider failure never prevents normal mood tracking.
+
+#### Feature 2 — AI-assisted mood inference
+
+**In progress.**
+
+Users who prefer not to explicitly select their mood will be able to describe how they feel using the existing reflection flow.
+
+AI will suggest an appropriate mood and feelings based on that description.
+
+AI suggestions remain advisory:
+
+- inferred values are shown to the user
+- the user can review or change them
+- AI never silently saves a mood on the user's behalf
+- normal manual mood logging remains available when AI is unavailable
+
+### v1.1 — Lightweight gamification
+
+Possible future enhancement after v1.0.
+
+Planned concepts include:
 
 - AI-generated optional micro-challenges
-- Deterministic achievement badges
+- deterministic achievement badges
 
-AI will be used for personalization, while normal application logic will handle progression and rewards.
+AI would be responsible only for personalization, while application logic would handle progression and rewards.
+
+## AI architecture
+
+AI functionality intentionally follows a small, explicit architecture:
+
+```text
+Application input
+       ↓
+Authenticated server request
+       ↓
+Daily quota enforcement
+       ↓
+Google Gemini
+       ↓
+Validated structured output
+       ↓
+Application UI
+```
+
+The project does not use agents, RAG, embeddings, vector databases, AI memory, or autonomous workflows.
+
+AI functionality is designed to fail gracefully without breaking the underlying mood tracker.
 
 ## Local development
 
@@ -92,7 +173,14 @@ npm install
 
 Create `.env.local` using `.env.example` as reference.
 
-Start the development server:
+The application requires configuration for:
+
+- Clerk
+- Neon PostgreSQL
+- Google Gemini
+- AI model and daily request limit
+
+Run database migrations as required by the project scripts, then start the development server:
 
 ```bash
 npm run dev
@@ -100,7 +188,7 @@ npm run dev
 
 ## Verification
 
-Depending on the scripts defined in `package.json`:
+Run:
 
 ```bash
 npm run lint
@@ -109,7 +197,9 @@ npm test
 npm run build
 ```
 
-End-to-end tests use Playwright.
+End-to-end testing uses Playwright where appropriate.
+
+The project includes automated coverage across domain validation, persistence, API behavior, authentication, client/backend integration, responsive interactions, AI quota enforcement, AI recommendation persistence, and fallback behavior.
 
 ## Project principles
 
@@ -120,7 +210,12 @@ The application intentionally favors:
 - accessible responsive UI
 - relational persistence
 - explicit server/client boundaries
-- carefully scoped AI functionality
+- server-side AI integration
+- validated structured AI output
+- predictable AI cost boundaries
+- graceful non-AI fallbacks
 - small, understandable dependencies
 
-The project is intentionally **not** an AI agent, therapy application, medical product, social network, or large recommendation system.
+AI enhances existing product interactions rather than becoming the product itself.
+
+The project is intentionally **not** an AI agent, therapy application, medical product, social network, chatbot, or complex recommendation system.
