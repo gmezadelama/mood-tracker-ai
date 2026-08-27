@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { fallbackSuggestionsForMood } from "@/domain/mood/fallback-suggestions";
+
 import { AiRecommendations } from "./ai-recommendations";
 import type { MockMoodEntry } from "./mock-data";
 
@@ -42,15 +44,39 @@ describe("AiRecommendations", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows the generate control only when there's no existing recommendation and quota remains", () => {
+  it("shows mood-specific static fallback content when there's no persisted recommendation", () => {
+    render(
+      <AiRecommendations entries={[entry({ mood: -2 })]} aiQuotaRemaining={2} onRecommendationReady={vi.fn()} />,
+    );
+
+    const fallback = fallbackSuggestionsForMood(-2);
+    expect(screen.getByText("Based on your selected mood")).toBeInTheDocument();
+    for (const activity of fallback.activities) {
+      expect(screen.getByText(activity)).toBeInTheDocument();
+    }
+    for (const phrase of fallback.phrases) {
+      expect(screen.getByText(phrase)).toBeInTheDocument();
+    }
+  });
+
+  it("does not call the API just to render fallback content", () => {
     render(
       <AiRecommendations entries={[entry()]} aiQuotaRemaining={2} onRecommendationReady={vi.fn()} />,
     );
 
-    expect(screen.getByRole("button", { name: "Get AI suggestions" })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("renders a persisted recommendation instead of a generate control", () => {
+  it("shows the generate control alongside fallback content when quota remains", () => {
+    render(
+      <AiRecommendations entries={[entry()]} aiQuotaRemaining={2} onRecommendationReady={vi.fn()} />,
+    );
+
+    expect(screen.getByText("Based on your selected mood")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate personalized suggestions" })).toBeInTheDocument();
+  });
+
+  it("shows a persisted AI recommendation instead of fallback content, labeled as AI-personalized", () => {
     render(
       <AiRecommendations
         entries={[entry({
@@ -61,21 +87,28 @@ describe("AiRecommendations", () => {
       />,
     );
 
+    expect(screen.getByText("Personalized by AI")).toBeInTheDocument();
     expect(screen.getByText("Take a short walk")).toBeInTheDocument();
     expect(screen.getByText("Be gentle with yourself.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Get AI suggestions" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Based on your selected mood")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate personalized suggestions" })).not.toBeInTheDocument();
+    const fallback = fallbackSuggestionsForMood(1);
+    expect(screen.queryByText(fallback.activities[0])).not.toBeInTheDocument();
   });
 
-  it("shows the subtle quota message instead of a generate control when quota is exhausted", () => {
+  it("still shows fallback content, without a usable generate control, when quota is exhausted", () => {
     render(
       <AiRecommendations entries={[entry()]} aiQuotaRemaining={0} onRecommendationReady={vi.fn()} />,
     );
 
+    expect(screen.getByText("Based on your selected mood")).toBeInTheDocument();
+    const fallback = fallbackSuggestionsForMood(1);
+    expect(screen.getByText(fallback.activities[0])).toBeInTheDocument();
     expect(screen.getByText("AI suggestions are available again tomorrow.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Get AI suggestions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate personalized suggestions" })).not.toBeInTheDocument();
   });
 
-  it("shows a loading state while generation is pending, then calls back with the result", async () => {
+  it("shows a loading state while generation is pending, then replaces fallback with the AI result", async () => {
     let resolveFetch!: (response: Response) => void;
     fetchMock.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
     const onRecommendationReady = vi.fn();
@@ -84,9 +117,9 @@ describe("AiRecommendations", () => {
       <AiRecommendations entries={[entry()]} aiQuotaRemaining={5} onRecommendationReady={onRecommendationReady} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Get AI suggestions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate personalized suggestions" }));
 
-    const pending = screen.getByRole("button", { name: "Generating suggestions…" });
+    const pending = screen.getByRole("button", { name: "Generating personalized suggestions…" });
     expect(pending).toBeDisabled();
     expect(pending).toHaveAttribute("aria-busy", "true");
 
@@ -104,29 +137,33 @@ describe("AiRecommendations", () => {
     );
   });
 
-  it("shows the subtle quota message when generation reports quota_exhausted", async () => {
+  it("still shows fallback content, plus the subtle quota message, when generation reports quota_exhausted", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ status: "quota_exhausted" }));
 
     render(
       <AiRecommendations entries={[entry()]} aiQuotaRemaining={1} onRecommendationReady={vi.fn()} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Get AI suggestions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate personalized suggestions" }));
 
     expect(await screen.findByText("AI suggestions are available again tomorrow.")).toBeInTheDocument();
+    const fallback = fallbackSuggestionsForMood(1);
+    expect(screen.getByText(fallback.activities[0])).toBeInTheDocument();
   });
 
-  it("shows a safe, non-alarming message on a provider failure", async () => {
+  it("still shows fallback content, plus a safe non-alarming message, on a provider failure", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ status: "unavailable" }));
 
     render(
       <AiRecommendations entries={[entry()]} aiQuotaRemaining={1} onRecommendationReady={vi.fn()} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Get AI suggestions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate personalized suggestions" }));
 
     expect(
       await screen.findByText("AI suggestions aren't available right now. Please try again later."),
     ).toBeInTheDocument();
+    const fallback = fallbackSuggestionsForMood(1);
+    expect(screen.getByText(fallback.activities[0])).toBeInTheDocument();
   });
 });

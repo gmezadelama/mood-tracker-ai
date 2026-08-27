@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { fallbackSuggestionsForMood, type MoodFallbackSuggestions } from "@/domain/mood/fallback-suggestions";
+
 import { moodLabels, type AiRecommendation, type MockMoodEntry } from "./mock-data";
 import { generateMoodRecommendations, MoodApiError } from "./mood-api";
 
@@ -72,21 +74,33 @@ export function AiRecommendations({
             </p>
 
             {entry.aiRecommendation ? (
-              <RecommendationContent recommendation={entry.aiRecommendation} />
-            ) : messageByEntryId[entry.id] ? (
-              <p className="mt-2 text-[14px] text-navy-muted">{messageByEntryId[entry.id]}</p>
-            ) : aiQuotaRemaining > 0 ? (
-              <button
-                type="button"
-                aria-busy={pendingId === entry.id}
-                disabled={pendingId !== null}
-                className="mt-2 text-[14px] font-semibold text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:no-underline"
-                onClick={() => void handleGenerate(entry.id)}
-              >
-                {pendingId === entry.id ? "Generating suggestions…" : "Get AI suggestions"}
-              </button>
+              <>
+                <SourceLabel text="Personalized by AI" />
+                <RecommendationContent recommendation={entry.aiRecommendation} />
+              </>
             ) : (
-              <p className="mt-2 text-[14px] text-navy-muted">{QUOTA_MESSAGE}</p>
+              <>
+                <SourceLabel text="Based on your selected mood" />
+                <RecommendationContent recommendation={fallbackSuggestionsForMood(entry.mood)} />
+
+                {messageByEntryId[entry.id] ? (
+                  <p className="mt-2 text-[13px] text-navy-muted">{messageByEntryId[entry.id]}</p>
+                ) : aiQuotaRemaining > 0 ? (
+                  <button
+                    type="button"
+                    aria-busy={pendingId === entry.id}
+                    disabled={pendingId !== null}
+                    className="mt-2 text-[13px] font-semibold text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 disabled:no-underline"
+                    onClick={() => void handleGenerate(entry.id)}
+                  >
+                    {pendingId === entry.id
+                      ? "Generating personalized suggestions…"
+                      : "Generate personalized suggestions"}
+                  </button>
+                ) : (
+                  <p className="mt-2 text-[13px] text-navy-muted">{QUOTA_MESSAGE}</p>
+                )}
+              </>
             )}
           </li>
         ))}
@@ -95,7 +109,15 @@ export function AiRecommendations({
   );
 }
 
-function RecommendationContent({ recommendation }: { recommendation: AiRecommendation }) {
+function SourceLabel({ text }: { text: string }) {
+  return <p className="mt-1 text-[12px] font-medium text-navy-muted/80">{text}</p>;
+}
+
+function RecommendationContent({
+  recommendation,
+}: {
+  recommendation: AiRecommendation | MoodFallbackSuggestions;
+}) {
   return (
     <div className="mt-2 grid gap-2 text-[14px] text-navy-muted">
       <ul className="list-disc pl-5">
