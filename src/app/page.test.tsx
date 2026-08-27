@@ -471,6 +471,40 @@ describe("Home integration", () => {
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/mood-inference")).toHaveLength(2);
   });
 
+  it("caps repeated failed inference → manual → assisted cycles at two requests per dialog", async () => {
+    await renderEmptyDashboard();
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ status: "unavailable", aiQuotaRemaining: 7 }))
+      .mockResolvedValueOnce(jsonResponse({ status: "unavailable", aiQuotaRemaining: 6 }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+
+    for (const reflection of [
+      "I am uncertain and low energy after a demanding morning.",
+      "I still feel uncertain, though the afternoon was a little calmer.",
+    ]) {
+      fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+      fireEvent.change(screen.getByLabelText("Write about your day..."), { target: { value: reflection } });
+      fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("isn't available right now");
+      fireEvent.click(screen.getByRole("button", { name: "Choose mood manually" }));
+    }
+
+    // A third manual → assisted cycle may reopen the assisted draft, but
+    // its generation control is permanently bounded for this dialog.
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    const blockedThirdAttempt = screen.getByRole("button", { name: "AI assistance unavailable" });
+    expect(blockedThirdAttempt).toBeDisabled();
+    fireEvent.click(blockedThirdAttempt);
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/mood-inference")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Close mood logging" }));
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    expect(screen.getByRole("button", { name: "Find a mood that fits" })).toBeEnabled();
+  });
+
   it.each([
     [0, "available", "AI mood assistance will be back tomorrow."],
     [8, "unavailable", "AI mood assistance isn't available right now."],

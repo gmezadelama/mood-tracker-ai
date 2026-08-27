@@ -18,6 +18,7 @@ import { AiQuotaNotice } from "./ai-quota-notice";
 
 const JOURNAL_LIMIT = 150;
 const AI_REFLECTION_MIN = 10;
+const MAX_INFERENCE_ATTEMPTS_PER_SESSION = 2;
 const moods: MockMood[] = [2, 1, 0, -1, -2];
 const sleepRanges: MockSleepRange[] = [9, 7.5, 5.5, 3.5, 1];
 
@@ -57,6 +58,7 @@ export function MoodLogDialog({
   const [aiMessage, setAiMessage] = useState("");
   const [isInferring, setIsInferring] = useState(false);
   const [hasRequestedInference, setHasRequestedInference] = useState(false);
+  const [inferenceAttempts, setInferenceAttempts] = useState(0);
   const [hasValidSuggestion, setHasValidSuggestion] = useState(false);
   const [hasUsedRetry, setHasUsedRetry] = useState(false);
   const [suggestionVersion, setSuggestionVersion] = useState(0);
@@ -111,16 +113,10 @@ export function MoodLogDialog({
     setDraft((current) => ({ ...current, mood: null, feelings: [] }));
     setError("");
     setAiMessage("");
-    // Only reachable via returnToManual(), which itself only exists while
-    // hasValidSuggestion is false — so this always starts a genuinely
-    // fresh attempt. Without resetting hasRequestedInference here, a
-    // failed first attempt would leave the "Find a mood that fits"
-    // control permanently disabled ("AI assistance unavailable") for the
-    // rest of the open dialog, even after the user deliberately chose to
-    // try assisted mode again.
+    // This resets only the guard for the assisted-mode visit. The dialog-
+    // lifetime attempt count deliberately survives manual/assisted mode
+    // changes, so cycling between them can never unlock a third request.
     setHasRequestedInference(false);
-    setHasValidSuggestion(false);
-    setHasUsedRetry(false);
     setStep("reflection");
   }
 
@@ -133,7 +129,7 @@ export function MoodLogDialog({
   }
 
   async function requestInference() {
-    if (hasRequestedInference) return;
+    if (hasRequestedInference || inferenceAttempts >= MAX_INFERENCE_ATTEMPTS_PER_SESSION) return;
     const reflection = draft.journalEntry.trim();
     if (reflection.length < AI_REFLECTION_MIN) {
       setError("Add a little more about how you're feeling so AI can suggest a mood.");
@@ -143,6 +139,7 @@ export function MoodLogDialog({
     setError("");
     setAiMessage("");
     setHasRequestedInference(true);
+    setInferenceAttempts((current) => current + 1);
     setIsInferring(true);
     try {
       const result = await inferMood(reflection);
@@ -164,9 +161,16 @@ export function MoodLogDialog({
   }
 
   async function retryInference() {
-    if (!hasValidSuggestion || hasUsedRetry || aiQuotaRemaining < 1 || isInferring) return;
+    if (
+      !hasValidSuggestion
+      || hasUsedRetry
+      || inferenceAttempts >= MAX_INFERENCE_ATTEMPTS_PER_SESSION
+      || aiQuotaRemaining < 1
+      || isInferring
+    ) return;
 
     setHasUsedRetry(true);
+    setInferenceAttempts((current) => current + 1);
     setError("");
     setAiMessage("");
     setIsInferring(true);
@@ -359,7 +363,7 @@ export function MoodLogDialog({
               </div>
               <div className="mt-6 border-t border-blue-100 pt-5">
                 <p className="text-[14px] leading-5 text-navy-muted">
-                  {hasUsedRetry
+                  {hasUsedRetry || inferenceAttempts >= MAX_INFERENCE_ATTEMPTS_PER_SESSION
                     ? "You can still change anything above before continuing."
                     : "Not quite right? You can change anything above or try one more suggestion."}
                 </p>
@@ -371,7 +375,7 @@ export function MoodLogDialog({
                     <p>You&apos;ve reached today&apos;s limit, but you can still choose your mood and feelings yourself.</p>
                   </div>
                 )}
-                {(isInferring || !hasUsedRetry) && aiQuotaRemaining > 0 && aiStatus === "available" && (
+                {(isInferring || (!hasUsedRetry && inferenceAttempts < MAX_INFERENCE_ATTEMPTS_PER_SESSION)) && aiQuotaRemaining > 0 && aiStatus === "available" && (
                   <button
                     type="button"
                     aria-busy={isInferring}
@@ -411,7 +415,7 @@ export function MoodLogDialog({
           <button
             type="button"
             aria-busy={isBusy}
-            disabled={isBusy || (step === "reflection" && isAssisted && hasRequestedInference && !hasValidSuggestion)}
+            disabled={isBusy || (step === "reflection" && isAssisted && !hasValidSuggestion && (hasRequestedInference || inferenceAttempts >= MAX_INFERENCE_ATTEMPTS_PER_SESSION))}
             className="h-[60px] w-full rounded-xl bg-brand text-[20px] font-semibold text-white outline-none hover:bg-[#3451c7] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-60"
             onClick={step === "sleep" ? submit : step === "review" ? confirmReview : step === "reflection" && isAssisted ? hasValidSuggestion ? returnToReview : requestInference : advanceManual}
           >
@@ -422,7 +426,7 @@ export function MoodLogDialog({
                   ? "Return to suggestion"
                   : isInferring
                     ? "Finding a mood that fits..."
-                    : hasRequestedInference
+                    : hasRequestedInference || inferenceAttempts >= MAX_INFERENCE_ATTEMPTS_PER_SESSION
                       ? "AI assistance unavailable"
                       : "Find a mood that fits"
                 : "Continue"}
