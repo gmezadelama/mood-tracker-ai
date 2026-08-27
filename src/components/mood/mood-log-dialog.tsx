@@ -111,6 +111,16 @@ export function MoodLogDialog({
     setDraft((current) => ({ ...current, mood: null, feelings: [] }));
     setError("");
     setAiMessage("");
+    // Only reachable via returnToManual(), which itself only exists while
+    // hasValidSuggestion is false — so this always starts a genuinely
+    // fresh attempt. Without resetting hasRequestedInference here, a
+    // failed first attempt would leave the "Find a mood that fits"
+    // control permanently disabled ("AI assistance unavailable") for the
+    // rest of the open dialog, even after the user deliberately chose to
+    // try assisted mode again.
+    setHasRequestedInference(false);
+    setHasValidSuggestion(false);
+    setHasUsedRetry(false);
     setStep("reflection");
   }
 

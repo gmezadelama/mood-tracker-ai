@@ -438,6 +438,39 @@ describe("Home integration", () => {
     expect(screen.getByRole("radio", { name: "Very Happy" })).toBeInTheDocument();
   });
 
+  it("allows a fresh assisted attempt after returning to manual following a failed first inference", async () => {
+    await renderEmptyDashboard();
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ status: "unavailable", aiQuotaRemaining: 7 }))
+      .mockResolvedValueOnce(jsonResponse({
+        status: "ready",
+        inference: { mood: 1, feelings: ["Hopeful"] },
+        aiQuotaRemaining: 6,
+      }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Log today's mood" }));
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    fireEvent.change(screen.getByLabelText("Write about your day..."), { target: { value: "I am uncertain and low energy." } });
+    fireEvent.click(screen.getByRole("button", { name: "Find a mood that fits" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("isn't available right now");
+    fireEvent.click(screen.getByRole("button", { name: "Choose mood manually" }));
+
+    // Re-entering assisted mode after abandoning a failed first attempt
+    // must offer a genuinely fresh attempt, not a permanently disabled
+    // control left over from the earlier failure.
+    fireEvent.click(screen.getByRole("button", { name: "Help me identify my mood" }));
+    fireEvent.change(screen.getByLabelText("Write about your day..."), {
+      target: { value: "Actually, I feel a bit more hopeful now." },
+    });
+    const secondAttempt = screen.getByRole("button", { name: "Find a mood that fits" });
+    expect(secondAttempt).toBeEnabled();
+    fireEvent.click(secondAttempt);
+
+    expect(await screen.findByRole("heading", { name: "Here's what your check-in suggests" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/mood-inference")).toHaveLength(2);
+  });
+
   it.each([
     [0, "available", "AI mood assistance will be back tomorrow."],
     [8, "unavailable", "AI mood assistance isn't available right now."],
